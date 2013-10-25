@@ -5,7 +5,10 @@ var defaultGhostStoreProvider = require('../../lib/simperium/ghost/default');
 var defaultObjectStoreProvider = require('../../lib/simperium/storage/default');
 var util = require('util');
 var jsondiff = require('../../lib/simperium/jsondiff')();
-var fn = require('../../lib/simperium/util/fn');
+var simperiumUtil = require('../../lib/simperium/util');
+var fn = simperiumUtil.fn;
+var format = util.format;
+var parseMessage = simperiumUtil.parseMessage;
 
 describe('Bucket', function(){
 
@@ -129,6 +132,23 @@ describe('Bucket', function(){
 
   })
 
+  it('should acknowledge sent change', function(done){
+
+    var bucket  = mockBucket(),
+        channel = bucket.channel,
+        data    = { title: "Auto acknowledge!" };
+
+    bucket.on('acknowledge', function(id){
+      assert.equal(undefined, bucket.localQueue.sent[id]);
+      done();
+    });
+
+    channel.autoAcknowledge();
+
+    var id = bucket.add(data);
+
+  })
+
 });
 
 function mockBucket(){
@@ -143,12 +163,39 @@ function mockBucket(){
 }
 
 function MockChannel(){
+  this.acknowledger = (function(data){
 
+    var change = JSON.parse(data),
+        ack    = {
+          id: change.id,
+          o: change.o,
+          v: change.v,
+          ev:change.sv ? change.sv + 1 : 0,
+          ccids: [change.ccid]
+        };
+
+      if (change.sv) {
+        ack.svn = change.sv;
+      }
+
+    this.emit('change', change.id, ack);
+  }).bind(this);
 }
 
 util.inherits(MockChannel, EventEmitter);
 
 MockChannel.prototype.send = function(data){
   this.emit('send', data);
+  var message = parseMessage(data);
+
+  this.emit(format('command.%s', message.command), message.data);
+}
+
+MockChannel.prototype.autoAcknowledge = function(){
+  this.on('command.c', this.acknowledger)
+}
+
+MockChannel.prototype.disableAutoAcknowledge = function(){
+  this.off('command.c', this.acknowledger);
 }
 
