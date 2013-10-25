@@ -1,12 +1,16 @@
 # Simperium Client library for Node.js
 
-To have a feature complete Simperium client using the websocket API and adaptable local storage layers.
+Goal: To have a feature complete Simperium client using the websocket API and adaptable local storage layers.
 
 ## Features
+
+Currently with this library you can:
 
 - authorize/create users
 - fetch bucket indexes
 - send receive changes
+
+See [the example](sample/simplenote.js) to get an idea of how the API looks.
 
 ## Unit Tests
 
