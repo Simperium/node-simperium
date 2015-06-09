@@ -9,20 +9,19 @@ client.users.on('authorize', function(user){
   var notes = client.bucket('note', user)
     , tags = client.bucket('tag', user);
 
-
   notes.on('index', function(){
 
-    var now = (new Date).getTime()
+    var now = (new Date()).getTime()
       , note = {
         content: "Hola mundo!"
-      , systemTags:[]
-      , tags:[]
-      , creationDate:now
-      , modificationDate:now
-      , publishURL:""
-      , shareURL:""
-      , deleted: false
-      , };
+        , systemTags:[]
+        , tags:[]
+        , creationDate:now
+        , modificationDate:now
+        , publishURL:""
+        , shareURL:""
+        , deleted: false
+      };
 
     var id = notes.add(note);
 
