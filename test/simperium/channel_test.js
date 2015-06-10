@@ -7,7 +7,7 @@ var assert = require('assert');
 describe('Channel', function(){
 
   it('should send init on connect', function(done){
-    var channel = mockChannel(),
+    var channel = makeChannel(),
         client = channel.client;
 
     channel.on('send', function(data){
@@ -19,17 +19,17 @@ describe('Channel', function(){
       assert.equal(1, payload.api);
       assert.equal('mock-app-id', payload.app_id);
       assert.equal('node-simperium', payload.library);
-      assert.equal(0, payload.version)
+      assert.equal(0, payload.version);
       done();
     });
 
     client.emit('connect');
 
-  })
+  });
 
-})
+});
 
-function mockChannel(id, bucketName, accessToken){
+function makeChannel(id, bucketName, accessToken){
 
   if (!bucketName) bucketName = 'things';
   if (!accessToken) accessToken = 'mock-token';

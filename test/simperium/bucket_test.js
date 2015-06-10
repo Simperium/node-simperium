@@ -1,5 +1,4 @@
 var assert = require('assert');
-var EventEmitter = require('events').EventEmitter;
 var Bucket = require('../../lib/simperium/bucket');
 var defaultGhostStoreProvider = require('../../lib/simperium/ghost/default');
 var defaultObjectStoreProvider = require('../../lib/simperium/storage/default');
@@ -8,16 +7,16 @@ var jsondiff = require('../../lib/simperium/jsondiff')();
 var simperiumUtil = require('../../lib/simperium/util');
 var fn = simperiumUtil.fn;
 var format = util.format;
-var parseMessage = simperiumUtil.parseMessage;
+var MockChannel = require('./mock_channel.js');
 
 describe('Bucket', function(){
 
   it('should store object update', function(done){
 
-    var bucket  = mockBucket()
-      , channel = bucket.channel
-      , id      = 'object'
-      , version = 1;
+    var bucket = makeBucket(),
+        channel = bucket.channel,
+        id      = 'object',
+        version = 1;
 
     bucket.on('update', function(updatedId){
       assert.equal(updatedId, id);
@@ -26,16 +25,16 @@ describe('Bucket', function(){
 
     channel.emit('version', id, version, { content:'lol' } );
 
-  })
+  });
 
   it('should apply change', function(done){
 
-    var bucket  = mockBucket()
-      , channel = bucket.channel
-      , id      = 'object'
-      , version = 1
-      , data    = { content: 'Lol' }
-      , change  = { sv: version,
+    var bucket = makeBucket(),
+        channel = bucket.channel,
+        id      = 'object',
+        version = 1,
+        data    = { content: 'Lol' },
+        change  = { sv: version,
                      o: 'M',
                      id: id,
                      clientid: 'sjs-2013070502-a1fab97d463883d66bae',
@@ -43,7 +42,7 @@ describe('Bucket', function(){
                      ev: 106,
                      cv: '5262d90aba5fdc4ed7eb2bc7',
                      ccids: [ 'ebd2c21c8a91be24c078746d9e935a3a' ]
-                   }
+                   };
 
     bucket.once('update', function(id, data){
 
@@ -63,18 +62,18 @@ describe('Bucket', function(){
 
   it('should queue multiple changes', function(done){
 
-    var bucket = mockBucket()
-      , diff = jsondiff.object_diff.bind(jsondiff)
-      , channel = bucket.channel
-      , id = 'object'
-      , version = 1
-      , version1 = { content: 'step 1'}
-      , version2 = { content: 'step 2'}
-      , version3 = { content: 'step 3'}
-      , change1 = { o: 'M', ev:1, cv:'cv1', id:id, v:diff({}, version1)}
-      , change2 = { o: 'M', ev:2, sv:1, cv:'cv2', id:id, v:diff(version1, version2)}
-      , change3 = { o: 'M', ev:3, sv:2, cv:'cv3', id:id, v:diff(version2, version3)}
-      , check = fn.counts(2, function(id, data){
+    var diff = jsondiff.object_diff.bind(jsondiff),
+        bucket = makeBucket(),
+        channel = bucket.channel,
+        id = 'object',
+        version = 1,
+        version1 = { content: 'step 1'},
+        version2 = { content: 'step 2'},
+        version3 = { content: 'step 3'},
+        change1 = { o: 'M', ev:1, cv:'cv1', id:id, v:diff({}, version1)},
+        change2 = { o: 'M', ev:2, sv:1, cv:'cv2', id:id, v:diff(version1, version2)},
+        change3 = { o: 'M', ev:3, sv:2, cv:'cv3', id:id, v:diff(version2, version3)},
+        check = fn.counts(2, function(id, data){
           assert.equal(data.content, 'step 3');
           done();
         });
@@ -85,18 +84,18 @@ describe('Bucket', function(){
     channel.emit('change', id, change2);
     channel.emit('change', id, change3);
 
-  })
+  });
 
   it('should send change to create object', function(done){
 
-    var bucket = mockBucket()
-      , channel = bucket.channel;
+    var bucket = makeBucket(),
+        channel = bucket.channel;
 
     channel.on('send', function(data){
-      var marker = data.indexOf(':')
-        , command = data.substring(0, marker)
-        , payload = JSON.parse(data.substring(marker +1))
-        , diff = payload.v;
+      var marker = data.indexOf(':'),
+          command = data.substring(0, marker),
+          payload = JSON.parse(data.substring(marker +1)),
+          diff = payload.v;
 
       assert.equal(command, 'c');
       assert.equal(diff.content.o, '+');
@@ -107,11 +106,11 @@ describe('Bucket', function(){
 
     bucket.add({content: "Hola mundo!"});
 
-  })
+  });
 
   it('should queue a change when pending exists', function(done){
 
-    var bucket    = mockBucket(),
+    var bucket    = makeBucket(),
         channel   = bucket.channel,
         data      = { title: "Hola mundo!", content: "Bienvenidos a Simperium" },
         data2     = { title: "Hell world!", content: "Welcome to Simperium" },
@@ -130,11 +129,11 @@ describe('Bucket', function(){
     objectId = bucket.add(data);
     bucket.update(objectId, data2);
 
-  })
+  });
 
   it('should acknowledge sent change', function(done){
 
-    var bucket  = mockBucket(),
+    var bucket = makeBucket(),
         channel = bucket.channel,
         data    = { title: "Auto acknowledge!" };
 
@@ -147,55 +146,17 @@ describe('Bucket', function(){
 
     var id = bucket.add(data);
 
-  })
+  });
 
 });
 
-function mockBucket(){
+function makeBucket(){
 
-  var channel = new MockChannel()
-    , options = {
-      ghostStoreProvider: defaultGhostStoreProvider,
-      objectStoreProvider: defaultObjectStoreProvider
-    };
+  var channel = new MockChannel(),
+      options = {
+        ghostStoreProvider: defaultGhostStoreProvider,
+        objectStoreProvider: defaultObjectStoreProvider
+      };
 
   return new Bucket('things', {access_token:'123'}, channel, options);
 }
-
-function MockChannel(){
-  this.acknowledger = (function(data){
-
-    var change = JSON.parse(data),
-        ack    = {
-          id: change.id,
-          o: change.o,
-          v: change.v,
-          ev:change.sv ? change.sv + 1 : 0,
-          ccids: [change.ccid]
-        };
-
-      if (change.sv) {
-        ack.svn = change.sv;
-      }
-
-    this.emit('change', change.id, ack);
-  }).bind(this);
-}
-
-util.inherits(MockChannel, EventEmitter);
-
-MockChannel.prototype.send = function(data){
-  this.emit('send', data);
-  var message = parseMessage(data);
-
-  this.emit(format('command.%s', message.command), message.data);
-}
-
-MockChannel.prototype.autoAcknowledge = function(){
-  this.on('command.c', this.acknowledger)
-}
-
-MockChannel.prototype.disableAutoAcknowledge = function(){
-  this.off('command.c', this.acknowledger);
-}
-

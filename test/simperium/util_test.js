@@ -35,7 +35,7 @@ describe("util.fn", function(){
           },
           times = fn.times(3, add, 1, 2);
 
-      assert.deepEqual(times(), [3,3,3])
+      assert.deepEqual(times(), [3,3,3]);
 
     });
 
