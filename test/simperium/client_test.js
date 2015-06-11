@@ -42,16 +42,38 @@ describe('Client', function() {
 
   });
 
+  it("should send heartbeat after timeout", function() {
+
+    client.connect();
+    client.heartbeat.onTimeout();
+
+    assert.equal(client.socket.lastMessage(), 'h:1');
+
+    client.socket.connection.emit('message', {type: 'utf8', utf8Data: 'h:2'});
+    client.heartbeat.onTimeout();
+
+    assert.equal(client.socket.lastMessage(), 'h:3');
+
+  });
+
 });
 
 function MockWebSocket(socket) {
   this.socket = socket;
-
+  var messages = this.messages = [];
   EventEmitter(this);
   this.connection = new EventEmitter();
+
+  this.connection.sendUTF = function(message) {
+    messages.push(message);
+  };
 }
 
 util.inherits(MockWebSocket, EventEmitter);
+
+MockWebSocket.prototype.lastMessage = function() {
+  return this.messages.slice(-1)[0];
+};
 
 MockWebSocket.prototype.connect = function(uri) {
   this.uri = uri;
@@ -59,4 +81,5 @@ MockWebSocket.prototype.connect = function(uri) {
   connection = this.connection;
   socket.emit('connect', connection);
 };
+
 
