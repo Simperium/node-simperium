@@ -28,6 +28,7 @@ describe('Client', function() {
     client.connect();
 
     assert.equal('wss://api.simperium.com/sock/1/app/websocket', client.socket.uri);
+    assert.equal(client.socket.connectionAttempts, 1);
 
   });
 
@@ -42,30 +43,84 @@ describe('Client', function() {
 
   });
 
-  it("should send heartbeat after timeout", function() {
+  it("should send heartbeat", function() {
 
     client.connect();
-    client.heartbeat.onTimeout();
+    client.heartbeat.onBeat();
 
     assert.equal(client.socket.lastMessage(), 'h:1');
 
     client.socket.connection.emit('message', {type: 'utf8', utf8Data: 'h:2'});
-    client.heartbeat.onTimeout();
+    client.heartbeat.onBeat();
 
     assert.equal(client.socket.lastMessage(), 'h:3');
+
+  });
+
+  it("should configure bucket", function() {
+
+    var bucket = client.bucket('things', {access_token: 'hell-world'});
+
+    assert.equal(bucket.name, 'things');
+
+  });
+
+  it("should reconnect after hearbeat timeout", function() {
+
+    client.connect();
+
+    // two heartbeats, no message
+    client.heartbeat.onTimeout();
+
+    assert.ok(client.reconnectionTimer.started);
+
+  });
+
+  it("should reconnect after disconnected", function(){
+
+    client.connect();
+    client.socket.connection.emit('close');
+
+    // The client should reconnect with a backoff algorithm
+    assert.ok(client.reconnectionTimer.timer);
+
+    client.reconnectionTimer.emit('tripped', 0);
+    assert.equal(client.socket.connectionAttempts, 2);
+
+  });
+
+  it("should backoff the reconnection timer", function() {
+
+    var timer = client.reconnectionTimer;
+
+    assert.equal(timer.interval(0), 3000);
+    assert.equal(timer.interval(1), 3000);
+    assert.equal(timer.interval(2), 3000);
+    assert.equal(timer.interval(3), 3000);
+    assert.equal(timer.interval(4), 6000);
 
   });
 
 });
 
 function MockWebSocket(socket) {
+  this.connectionAttempts = 0;
+  this.closeAttempts = 0;
   this.socket = socket;
   var messages = this.messages = [];
+
+  var self = this;
+
   EventEmitter(this);
-  this.connection = new EventEmitter();
+  var connection = this.connection = new EventEmitter();
 
   this.connection.sendUTF = function(message) {
     messages.push(message);
+  };
+
+  this.connection.close = function() {
+    self.closeAttempts ++;
+    connection.emit('close');
   };
 }
 
@@ -76,6 +131,7 @@ MockWebSocket.prototype.lastMessage = function() {
 };
 
 MockWebSocket.prototype.connect = function(uri) {
+  this.connectionAttempts ++;
   this.uri = uri;
   var socket = this.socket,
   connection = this.connection;
