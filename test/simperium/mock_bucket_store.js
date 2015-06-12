@@ -10,9 +10,11 @@ function BucketStore() {
 
 BucketStore.prototype.get = function(id, callback) {
   var objects = this.objects;
+
   process.nextTick(function() {
     callback(null, id, objects[id]);    
   });
+
 };
 
 BucketStore.prototype.update = function(id, object, callback) {

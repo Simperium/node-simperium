@@ -39,19 +39,26 @@ describe('Bucket', function(){
 
     var id      = 'thing',
         version = 1,
-        object  = {"one": "two"},
-        updateCount = 0;
-
-    bucket.on('update', function() {
-      updateCount ++;
-    });
+        object  = {"one": "two"};
 
     bucket.update(id, object, function(error, updatedId, savedObject) {
       bucket.get(id, function(err, id, savedObject) {
         assert.deepEqual(object, savedObject);
-        assert.equal(updateCount, 1);
         done();
       });
+    });
+
+  });
+
+  it('should delete object data', function(done) {
+
+    store.objects = {
+      'hello': {title: 'hola mundo'}
+    };
+
+    bucket.remove('hello', function(err, id) {
+      assert.ok(!store.objects.hello);
+      done();
     });
 
   });

@@ -15,6 +15,10 @@ describe('Channel', function(){
 
   beforeEach(function() {
     bucket = new EventEmitter();
+    bucket.update = bucket.remove = function(){
+      var args = [].slice.apply(arguments);
+      args.slice(-1)[0].apply(this, [null].concat(args.slice(0,-1)));
+    };
     bucket.name = 'things';
     channel = new Channel('mock-app-id', 'mock-token', bucket, defaultGhostStoreProvider({user:'someuser'}, bucket));
   });
@@ -107,7 +111,7 @@ describe('Channel', function(){
 
     });
 
-    bucket.emit('update', '12345', {content: "Hola mundo!"});
+    bucket.update('12345', {content: "Hola mundo!"});
 
   });
 
@@ -128,8 +132,8 @@ describe('Channel', function(){
     });
 
     objectId = '123456';
-    bucket.emit('update', objectId, data);
-    bucket.emit('update', objectId, data2);
+    bucket.update(objectId, data);
+    bucket.update(objectId, data2);
 
   });
 
@@ -161,7 +165,7 @@ describe('Channel', function(){
     });
 
     // channel.autoAcknowledge();
-    bucket.emit('update', 'mock-id', data);
+    bucket.update('mock-id', data);
 
   });
 
