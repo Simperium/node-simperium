@@ -20,6 +20,7 @@ var MockChannel = module.exports = function() {
 
     this.emit('change', change.id, ack);
   }).bind(this);
+  EventEmitter(this);
 };
 
 util.inherits(MockChannel, EventEmitter);

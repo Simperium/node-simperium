@@ -89,6 +89,30 @@ describe('Client', function() {
 
   });
 
+  it("should not reconnect when unauthorized", function(done) {
+    var bucket = client.bucket("test", {access_token: "mock-token"}),
+        unauthorized = false;
+
+    client.on('unauthorized', function(reason) {
+      unauthorized = reason;
+    });
+
+    client.on('send', function(message) {
+      var channel = message.slice(0, message.indexOf(':'));
+      client.emit(util.format('channel:%d', channel), 'auth:{"msg": "Error validating token", "code": 500}');
+      assert.ok(!client.reconnect, "client is set to reconnect");
+      process.nextTick(function() {
+        client.socket.connection.emit('close');
+        assert.ok(!client.reconnectionTimer.started, "Reconnection timer is running");
+        assert.ok(unauthorized);
+        done();        
+      });
+    });
+
+    client.connect();
+
+  });
+
   it("should backoff the reconnection timer", function() {
 
     var timer = client.reconnectionTimer;
@@ -134,7 +158,8 @@ MockWebSocket.prototype.connect = function(uri) {
   this.connectionAttempts ++;
   this.uri = uri;
   var socket = this.socket,
-  connection = this.connection;
+      connection = this.connection;
+
   socket.emit('connect', connection);
 };
 
