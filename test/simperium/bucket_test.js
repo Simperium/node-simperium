@@ -1,7 +1,6 @@
 var assert = require('assert');
 var Bucket = require('../../lib/simperium/bucket');
-var defaultGhostStoreProvider = require('../../lib/simperium/ghost/default');
-var defaultObjectStoreProvider = require('../../lib/simperium/storage/default');
+var storeProvider = require('./mock_bucket_store');
 var util = require('util');
 var simperiumUtil = require('../../lib/simperium/util');
 var fn = simperiumUtil.fn;
@@ -11,12 +10,28 @@ var MockChannel = require('./mock_channel.js');
 
 describe('Bucket', function(){
 
-  var bucket, channel;
+  var bucket, channel, store;
 
   beforeEach(function() {
 
-    bucket = new Bucket('things', {access_token:'123'}, defaultObjectStoreProvider);
+    bucket = new Bucket('things', {access_token:'123'}, storeProvider);
+    store = bucket.store;
     channel = new MockChannel();
+
+  });
+
+  it('should fetch object data', function(done) {
+
+    var object = {title: 'hi'};
+    store.objects = {
+      'hello': object
+    };
+
+    bucket.get('hello', function(e, id, found) {
+      assert.equal(id, 'hello');
+      assert.deepEqual(found, object);
+      done();
+    });
 
   });
 
