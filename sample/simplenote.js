@@ -1,13 +1,15 @@
 var Client = require('../lib/simperium/client');
+var Auth = require('../lib/simperium/auth');
 
-var client = new Client(process.env.SIMPERIUM_APP_ID, process.env.SIMPERIUM_APP_SECRET);
+var client = new Client(process.env.SIMPERIUM_APP_ID);
+var auth = new Auth(process.env.SIMPERIUM_APP_ID, process.env.SIMPERIUM_APP_SECRET)
 
 client.connect();
 
-client.users.on('authorize', function(user){
+auth.on('authorize', function(user){
 
-  var notes = client.bucket('note', user),
-      tags = client.bucket('tag', user);
+  var notes = client.bucket('note', user.access_token),
+      tags = client.bucket('tag', user.access_token);
 
   notes.on('index', function(){
 
@@ -36,7 +38,7 @@ client.users.on('authorize', function(user){
 
 });
 
-client.users.authorize(
+auth.authorize(
   process.env.SIMPLENOTE_USERNAME,
   process.env.SIMPLENOTE_PASSWORD
 ).then(function(user){

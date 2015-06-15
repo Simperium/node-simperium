@@ -14,7 +14,7 @@ describe('Bucket', function(){
 
   beforeEach(function() {
 
-    bucket = new Bucket('things', {access_token:'123'}, storeProvider);
+    bucket = new Bucket('things', storeProvider);
     store = bucket.store;
     channel = new MockChannel();
 

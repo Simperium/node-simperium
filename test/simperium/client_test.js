@@ -10,7 +10,7 @@ describe('Client', function() {
   var client;
 
   beforeEach(function() {
-    client = new Client('app', 'secret', {
+    client = new Client('app', {
         ghostStoreProvider: defaultGhostStoreProvider,
         objectStoreProvider: defaultObjectStoreProvider
     });
@@ -59,7 +59,7 @@ describe('Client', function() {
 
   it("should configure bucket", function() {
 
-    var bucket = client.bucket('things', {access_token: 'hell-world'});
+    var bucket = client.bucket('things', 'hell-world');
 
     assert.equal(bucket.name, 'things');
 

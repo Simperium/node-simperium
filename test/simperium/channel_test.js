@@ -20,7 +20,7 @@ describe('Channel', function(){
       args.slice(-1)[0].apply(this, [null].concat(args.slice(0,-1)));
     };
     bucket.name = 'things';
-    channel = new Channel('mock-app-id', 'mock-token', bucket, defaultGhostStoreProvider({user:'someuser'}, bucket));
+    channel = new Channel('mock-app-id', 'mock-token', bucket, defaultGhostStoreProvider(bucket));
   });
 
   it('should send init on connect', function(done){
