@@ -7,7 +7,7 @@ var simperiumUtils = require('../../lib/simperium/util');
 var fn = simperiumUtils.fn;
 var jsondiff = require('../../lib/simperium/jsondiff')();
 var defaultGhostStoreProvider = require('../../lib/simperium/ghost/default');
-
+var uuid = require('node-uuid');
 
 describe('Channel', function(){
 
@@ -235,7 +235,6 @@ describe('Channel', function(){
       });
 
       channel.onConnect();
-      channel.handleMessage('auth:user@example.com');
 
     });
 
@@ -249,17 +248,23 @@ describe('Channel', function(){
         done();      
       });
 
+      channel.handleMessage('auth:user@example.com');
+
     });
 
     it('should request cv', function(done) {
 
-      channel.cv = 'abcdefg';
+      var cv = "abcdefg";
 
       channel.once('send', function(data) {
         var message = parseMessage(data);
         assert.equal('cv', message.command);
-        assert.equal('abcdefg', message.data);
+        assert.equal(cv, message.data);
         done();
+      });
+
+      store.setChangeVersion(cv).then(function(cv) {
+        channel.handleMessage('auth:user@example.com');
       });
 
     });
@@ -268,7 +273,9 @@ describe('Channel', function(){
 
 });
 
-function acknowledge(channel, msg) {
+function acknowledge(channel, msg, cv) {
+  if (!cv) cv = uuid.v4();
+
   var message = parseMessage(msg),
       change = JSON.parse(message.data),
       ack = {
@@ -276,7 +283,8 @@ function acknowledge(channel, msg) {
         o: change.o,
         v: change.v,
         ev: change.sv ? change.sv + 1 : 0,
-        ccids: [change.ccid]
+        ccids: [change.ccid],
+        cv: cv
       };
 
       if (change.sv) {
