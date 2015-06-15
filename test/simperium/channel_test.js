@@ -97,114 +97,122 @@ describe('Channel', function(){
 
   });
 
-  it('should send change to create object', function(done){
+  describe("with index", function() {
 
-    channel.on('send', function(data){
-      var marker = data.indexOf(':'),
-          command = data.substring(0, marker),
-          payload = JSON.parse(data.substring(marker +1)),
-          diff = payload.v;
+    beforeEach(function() {
+      channel.localQueue.start();
+    });
 
-      assert.equal(command, 'c');
-      assert.equal(diff.content.o, '+');
-      assert.equal(diff.content.v, 'Hola mundo!');
-      done();
+    it('should send change to create object', function(done){
+
+      channel.on('send', function(data){
+        var marker = data.indexOf(':'),
+            command = data.substring(0, marker),
+            payload = JSON.parse(data.substring(marker +1)),
+            diff = payload.v;
+
+        assert.equal(command, 'c');
+        assert.equal(diff.content.o, '+');
+        assert.equal(diff.content.v, 'Hola mundo!');
+        done();
+
+      });
+
+      bucket.update('12345', {content: "Hola mundo!"});
 
     });
 
-    bucket.update('12345', {content: "Hola mundo!"});
+    it('should queue a change when pending exists', function(done){
 
-  });
+      var data      = { title: "Hola mundo!", content: "Bienvenidos a Simperium" },
+          data2     = { title: "Hell world!", content: "Welcome to Simperium" },
+          checkSent = function(){
+            throw new Error("Sent too many changes");
+          },
+          objectId = '123456';
 
-  it('should queue a change when pending exists', function(done){
+      channel.on('send', fn.counts(1, checkSent));
 
-    var data      = { title: "Hola mundo!", content: "Bienvenidos a Simperium" },
-        data2     = { title: "Hell world!", content: "Welcome to Simperium" },
-        checkSent = function(){
-          throw new Error("Sent too many changes");
-        },
-        objectId = '123456';
-
-    channel.on('send', fn.counts(1, checkSent));
-
-    channel.localQueue.on('wait', function(id){
-      assert.equal(id, objectId);
-      done();
-    });
-
-    objectId = '123456';
-    bucket.update(objectId, data);
-    bucket.update(objectId, data2);
-
-  });
-
-  it('should acknowledge sent change', function(done){
-
-    var data = { title: "Auto acknowledge!" };
-
-    channel.on('acknowledge', function(id){
-      assert.equal(undefined, channel.localQueue.sent[id]);
-      done();
-    });
-
-    channel.on('send', function(msg) {
-      acknowledge(channel, msg);
-    });
-
-    bucket.update('mock-id', data);
-
-  });
-
-  it("should send remove operation", function(done){
-
-    channel.on('send', function(msg) {
-      var message = parseMessage(msg),
-          change = JSON.parse(message.data);
-
-      assert.equal(change.o, '-');
-      assert.equal(change.id, '123');
-
-      // acknowledge the change
-      acknowledge(channel, msg);
-
-    });
-
-    channel.on('acknowledge', function() {
-
-      store.get("123").then(function(ghost) {
-        assert.ok(!ghost.version, "store should have deleted ghost");
-        assert.deepEqual(ghost.data, {});
+      channel.localQueue.on('wait', function(id){
+        assert.equal(id, objectId);
         done();
       });
 
+      objectId = '123456';
+      bucket.update(objectId, data);
+      bucket.update(objectId, data2);
+
     });
 
-    store.put("123", 3, {title: "hello world"}).then(function() {
-      store.get("123").then(function(ghost) {
-        assert.equal(ghost.version, 3);
-        bucket.remove('123');
+    it('should acknowledge sent change', function(done){
+
+      var data = { title: "Auto acknowledge!" };
+
+      channel.on('acknowledge', function(id){
+        assert.equal(undefined, channel.localQueue.sent[id]);
+        done();
       });
+
+      channel.on('send', function(msg) {
+        acknowledge(channel, msg);
+      });
+
+      bucket.update('mock-id', data);
+
     });
 
-  });
+    it("should send remove operation", function(done){
 
-  it("should wait for changes before removing", function(done) {
-    var validate = fn.counts(1, function(id) {
-      var queue = channel.localQueue.queues["123"];
-      assert.equal(queue.length, 2);
-      assert.equal(queue.slice(-1)[0].o, '-');
-      done();
+      channel.on('send', function(msg) {
+        var message = parseMessage(msg),
+            change = JSON.parse(message.data);
+
+        assert.equal(change.o, '-');
+        assert.equal(change.id, '123');
+
+        // acknowledge the change
+        acknowledge(channel, msg);
+
+      });
+
+      channel.on('acknowledge', function() {
+
+        store.get("123").then(function(ghost) {
+          assert.ok(!ghost.version, "store should have deleted ghost");
+          assert.deepEqual(ghost.data, {});
+          done();
+        });
+
+      });
+
+      store.put("123", 3, {title: "hello world"}).then(function() {
+        store.get("123").then(function(ghost) {
+          assert.equal(ghost.version, 3);
+          bucket.remove('123');
+        });
+      });
+
     });
 
-    channel.localQueue.on('wait', validate);
+    it("should wait for changes before removing", function(done) {
+      var validate = fn.counts(1, function(id) {
+        var queue = channel.localQueue.queues["123"];
+        assert.equal(queue.length, 2);
+        assert.equal(queue.slice(-1)[0].o, '-');
+        done();
+      });
 
-    channel.once('send', function(msg) {
-      bucket.update("123", {title: "hello again world"});
-      bucket.remove("123");
-    });
+      channel.localQueue.on('wait', validate);
 
-    store.put("123", 3, {title: "hello world"}).then(function() {
-      bucket.update("123", {title: "goodbye world"});
+      channel.once('send', function(msg) {
+        bucket.update("123", {title: "hello again world"});
+        bucket.remove("123");
+      });
+
+      store.put("123", 3, {title: "hello world"}).then(function() {
+        bucket.update("123", {title: "goodbye world"});
+      });
+
     });
 
   });
