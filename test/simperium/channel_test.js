@@ -8,18 +8,14 @@ var fn = simperiumUtils.fn;
 var jsondiff = require('../../lib/simperium/jsondiff')();
 var defaultGhostStoreProvider = require('../../lib/simperium/ghost/default');
 var uuid = require('node-uuid');
+var Bucket = require('../../lib/simperium/bucket');
 
 describe('Channel', function(){
 
   var channel, bucket, store;
 
   beforeEach(function() {
-    bucket = new EventEmitter();
-    bucket.update = bucket.remove = function(){
-      var args = [].slice.apply(arguments);
-      args.slice(-1)[0].apply(this, [null].concat(args.slice(0,-1)));
-    };
-    bucket.name = 'things';
+    bucket = new Bucket('things', require('./mock_bucket_store'));
     store = defaultGhostStoreProvider(bucket);
     channel = new Channel('mock-app-id', 'mock-token', bucket, store);
   });
@@ -211,6 +207,42 @@ describe('Channel', function(){
 
       store.put("123", 3, {title: "hello world"}).then(function() {
         bucket.update("123", {title: "goodbye world"});
+      });
+
+    });
+
+    it("should notify bucket after receiving a network change", function(done) {
+
+      var diff    = jsondiff.object_diff.bind(jsondiff),
+          id      = 'object',
+          version = 1,
+          data    = { content: 'step 1'},
+          change  = { o: 'M', ev:1, cv:'cv1', id:id, v:diff({}, data)};
+
+      bucket.on('update', function(err) {
+        bucket.get('object', function(err, id, object) {
+          assert.equal(object.content, 'step 1');
+          done();
+        });
+      });
+
+      channel.handleMessage('c:' + JSON.stringify([change]));
+
+    });
+
+    it("should notify bucket after network deletion", function(done) {
+
+      bucket.update('object', {title: "hello world"}, function(e, object) {
+        channel.handleMessage('c:' + JSON.stringify([{
+          o: '-', ev: 1, cv: 'cv1', id: 'object'
+        }]));
+      });
+
+      bucket.on('remove', function(id) {
+        bucket.get(id, function(e, id, object) {
+          assert.ok(!object);
+          done();
+        });
       });
 
     });

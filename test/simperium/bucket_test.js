@@ -6,17 +6,15 @@ var simperiumUtil = require('../../lib/simperium/util');
 var fn = simperiumUtil.fn;
 var format = util.format;
 var parseMessage = simperiumUtil.parseMessage;
-var MockChannel = require('./mock_channel.js');
 
 describe('Bucket', function(){
 
-  var bucket, channel, store;
+  var bucket, store;
 
   beforeEach(function() {
 
     bucket = new Bucket('things', storeProvider);
     store = bucket.store;
-    channel = new MockChannel();
 
   });
 
@@ -62,7 +60,6 @@ describe('Bucket', function(){
     });
 
   });
-
 
 });
 
