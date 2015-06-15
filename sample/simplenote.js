@@ -8,8 +8,10 @@ client.connect();
 
 auth.on('authorize', function(user){
 
-  var notes = client.bucket('note', user.access_token),
-      tags = client.bucket('tag', user.access_token);
+  client.accessToken = user.access_token;
+
+  var notes = client.bucket('note'),
+      tags = client.bucket('tag');
 
   notes.on('index', function(){
 

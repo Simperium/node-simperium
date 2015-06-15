@@ -10,7 +10,7 @@ describe('Client', function() {
   var client;
 
   beforeEach(function() {
-    client = new Client('app', {
+    client = new Client('app', 'token', {
         ghostStoreProvider: defaultGhostStoreProvider,
         objectStoreProvider: defaultObjectStoreProvider
     });
@@ -59,7 +59,7 @@ describe('Client', function() {
 
   it("should configure bucket", function() {
 
-    var bucket = client.bucket('things', 'hell-world');
+    var bucket = client.bucket('things');
 
     assert.equal(bucket.name, 'things');
 
@@ -90,7 +90,7 @@ describe('Client', function() {
   });
 
   it("should not reconnect when unauthorized", function(done) {
-    var bucket = client.bucket("test", {access_token: "mock-token"}),
+    var bucket = client.bucket("test"),
         unauthorized = false;
 
     client.on('unauthorized', function(reason) {
