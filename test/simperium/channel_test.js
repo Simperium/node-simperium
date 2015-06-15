@@ -148,21 +148,7 @@ describe('Channel', function(){
     });
 
     channel.on('send', function(msg) {
-      var message = parseMessage(msg),
-          change = JSON.parse(message.data),
-          ack = {
-            id: change.id,
-            o: change.o,
-            v: change.v,
-            ev: change.sv ? change.sv + 1 : 0,
-            ccids: [change.ccid]
-          };
-
-          if (change.sv) {
-            ack.sv = change.sv;
-          }
-
-      channel.handleMessage(util.format("c:%s", JSON.stringify([ack])));
+      acknowledge(channel, msg);
     });
 
     bucket.update('mock-id', data);
@@ -178,14 +164,27 @@ describe('Channel', function(){
       assert.equal(change.o, '-');
       assert.equal(change.id, '123');
 
-      done();
+      // acknowledge the change
+      acknowledge(channel, msg);
+
+    });
+
+    channel.on('acknowledge', function() {
+
+      store.get("123").then(function(ghost) {
+        assert.ok(!ghost.version, "store should have deleted ghost");
+        assert.deepEqual(ghost.data, {});
+        done();
+      });
 
     });
 
     store.put("123", 3, {title: "hello world"}).then(function() {
-      bucket.remove('123');
+      store.get("123").then(function(ghost) {
+        assert.equal(ghost.version, 3);
+        bucket.remove('123');
+      });
     });
-
 
   });
 
@@ -269,3 +268,20 @@ describe('Channel', function(){
 
 });
 
+function acknowledge(channel, msg) {
+  var message = parseMessage(msg),
+      change = JSON.parse(message.data),
+      ack = {
+        id: change.id,
+        o: change.o,
+        v: change.v,
+        ev: change.sv ? change.sv + 1 : 0,
+        ccids: [change.ccid]
+      };
+
+      if (change.sv) {
+        ack.sv = change.sv;
+      }
+
+  channel.handleMessage(util.format("c:%s", JSON.stringify([ack])));
+}
