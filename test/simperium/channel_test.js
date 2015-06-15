@@ -11,7 +11,7 @@ var defaultGhostStoreProvider = require('../../lib/simperium/ghost/default');
 
 describe('Channel', function(){
 
-  var channel, bucket;
+  var channel, bucket, store;
 
   beforeEach(function() {
     bucket = new EventEmitter();
@@ -20,7 +20,8 @@ describe('Channel', function(){
       args.slice(-1)[0].apply(this, [null].concat(args.slice(0,-1)));
     };
     bucket.name = 'things';
-    channel = new Channel('mock-app-id', 'mock-token', bucket, defaultGhostStoreProvider(bucket));
+    store = defaultGhostStoreProvider(bucket);
+    channel = new Channel('mock-app-id', 'mock-token', bucket, store);
   });
 
   it('should send init on connect', function(done){
@@ -164,8 +165,48 @@ describe('Channel', function(){
       channel.handleMessage(util.format("c:%s", JSON.stringify([ack])));
     });
 
-    // channel.autoAcknowledge();
     bucket.update('mock-id', data);
+
+  });
+
+  it("should send remove operation", function(done){
+
+    channel.on('send', function(msg) {
+      var message = parseMessage(msg),
+          change = JSON.parse(message.data);
+
+      assert.equal(change.o, '-');
+      assert.equal(change.id, '123');
+
+      done();
+
+    });
+
+    store.put("123", 3, {title: "hello world"}).then(function() {
+      bucket.remove('123');
+    });
+
+
+  });
+
+  it("should wait for changes before removing", function(done) {
+    var validate = fn.counts(1, function(id) {
+      var queue = channel.localQueue.queues["123"];
+      assert.equal(queue.length, 2);
+      assert.equal(queue.slice(-1)[0].o, '-');
+      done();
+    });
+
+    channel.localQueue.on('wait', validate);
+
+    channel.once('send', function(msg) {
+      bucket.update("123", {title: "hello again world"});
+      bucket.remove("123");
+    });
+
+    store.put("123", 3, {title: "hello world"}).then(function() {
+      bucket.update("123", {title: "goodbye world"});
+    });
 
   });
 
