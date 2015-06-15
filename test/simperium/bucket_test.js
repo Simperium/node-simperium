@@ -25,8 +25,7 @@ describe('Bucket', function(){
       'hello': object
     };
 
-    bucket.get('hello', function(e, id, found) {
-      assert.equal(id, 'hello');
+    bucket.get('hello', function(e, found) {
       assert.deepEqual(found, object);
       done();
     });
@@ -40,7 +39,7 @@ describe('Bucket', function(){
         object  = {"one": "two"};
 
     bucket.update(id, object, function(error, updatedId, savedObject) {
-      bucket.get(id, function(err, id, savedObject) {
+      bucket.get(id, function(err, savedObject) {
         assert.deepEqual(object, savedObject);
         done();
       });

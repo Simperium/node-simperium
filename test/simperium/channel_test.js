@@ -220,7 +220,7 @@ describe('Channel', function(){
           change  = { o: 'M', ev:1, cv:'cv1', id:id, v:diff({}, data)};
 
       bucket.on('update', function(err) {
-        bucket.get('object', function(err, id, object) {
+        bucket.get('object', function(err, object) {
           assert.equal(object.content, 'step 1');
           done();
         });

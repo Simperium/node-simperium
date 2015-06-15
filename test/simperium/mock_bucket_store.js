@@ -12,7 +12,7 @@ BucketStore.prototype.get = function(id, callback) {
   var objects = this.objects;
 
   process.nextTick(function() {
-    callback(null, id, objects[id]);    
+    callback(null, objects[id]);
   });
 
 };
@@ -20,13 +20,13 @@ BucketStore.prototype.get = function(id, callback) {
 BucketStore.prototype.update = function(id, object, callback) {
   this.objects[id] = object;
   process.nextTick(function() {
-    callback(null, id, object);    
+    callback(null, object);
   });
 };
 
 BucketStore.prototype.remove = function(id, callback) {
   delete this.objects[id];
   process.nextTick(function() {
-    callback(null, id);    
+    callback(null);
   });
 };
