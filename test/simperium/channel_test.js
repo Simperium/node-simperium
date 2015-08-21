@@ -42,7 +42,7 @@ describe('Channel', function(){
 
   it('should apply change', function(done){
 
-    var id      = 'object',
+    var id      = 'thingamajig',
         version = 1,
         data    = { content: 'Lol' },
         changes = [{ sv: version,
@@ -56,7 +56,6 @@ describe('Channel', function(){
                    }];
 
     channel.once('update', function(id, data){
-
       assert.equal(data.content, 'Lol');
 
       channel.once('update', function(id, data){
@@ -232,11 +231,7 @@ describe('Channel', function(){
 
     it("should notify bucket after network deletion", function(done) {
 
-      bucket.update('object', {title: "hello world"}, function(e, object) {
-        channel.handleMessage('c:' + JSON.stringify([{
-          o: '-', ev: 1, cv: 'cv1', id: 'object'
-        }]));
-      });
+      var key = "deleteTest";
 
       bucket.on('remove', function(id) {
         bucket.get(id, function(e, id, object) {
@@ -244,6 +239,13 @@ describe('Channel', function(){
           done();
         });
       });
+
+      bucket.update(key, {title: "hello world"}, function(e, object) {
+        channel.handleMessage('c:' + JSON.stringify([{
+          o: '-', ev: 1, cv: 'cv1', id: key
+        }]));
+      });
+
 
     });
 
