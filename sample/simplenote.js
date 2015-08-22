@@ -47,7 +47,8 @@ auth.authorize(
 ).then(function(user){
   console.log("Logged in", user);
 }, function(error) {
-  console.error("Failed to authenticate", error);
+  console.error("Failed to authenticate", error, error.stack);
+  throw(error);
   client.end();
 });
 
