@@ -9,6 +9,7 @@ var jsondiff = require('../../lib/simperium/jsondiff')();
 var defaultGhostStoreProvider = require('../../lib/simperium/ghost/default');
 var uuid = require('node-uuid');
 var Bucket = require('../../lib/simperium/bucket');
+var diff = jsondiff.object_diff.bind(jsondiff);
 
 describe('Channel', function(){
 
@@ -246,6 +247,36 @@ describe('Channel', function(){
         }]));
       });
 
+
+    });
+
+    // If receiving a remote change while there are unsent local modifications,
+    // local changes should be rebased onto the new ghost and re-sent
+    it("should resolve applying patch to modified object", function(done) {
+
+      // add an item to the index
+      var key = 'hello',
+          current = { title: 'Hello world' },
+          remoteDiff = diff(current, { title: 'Hello kansas'});
+
+      store.index[key] = JSON.stringify({ version: 1, data: current });
+
+      // when the channel is updated, it should be the result of
+      // the local changes being rebased on top of changes coming from the
+      // network which should ultimately be "Goodbye kansas"
+      channel.on('update', function(key, data){
+        assert.equal(data.title, 'Goodbye kansas');
+        assert.equal(channel.localQueue.sent[key].v.title.v, "-5\t+Goodbye\t=7");
+        done();
+      });
+
+      // We receive a remote change from "Hello world" to "Hello kansas"
+      channel.handleMessage('c:' + JSON.stringify([{
+        o: 'M', ev: 2, sv: 1, cv: 'cv1', id: key, v: remoteDiff
+      }]));
+
+      // We're changing "Hello world" to "Goodbye world"
+      bucket.update(key, {title: 'Goodbye world'});
 
     });
 

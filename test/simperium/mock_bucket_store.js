@@ -1,4 +1,3 @@
-var defer = require('node-promise').defer;
 
 module.exports = function(bucket){
   return new BucketStore();
