@@ -9,6 +9,7 @@ var jsondiff = require('../../lib/simperium/jsondiff')();
 var defaultGhostStoreProvider = require('../../lib/simperium/ghost/default');
 var uuid = require('node-uuid');
 var Bucket = require('../../lib/simperium/bucket');
+var diff = jsondiff.object_diff.bind(jsondiff);
 
 describe('Channel', function(){
 
@@ -115,6 +116,23 @@ describe('Channel', function(){
       });
 
       bucket.update('12345', {content: "Hola mundo!"});
+
+    });
+
+    it('should not send a change with an empty diff', function(done) {
+
+      // put in a mock ghost
+      var data = { title: 'hello world'};
+      channel.store.put('thing', 1, {title: 'hello world'})
+      .then(function() {
+        channel.localQueue.on('send', function() {
+          assert.fail("Channel should not send empty changes");
+        });
+        channel.once('unmodified', function() {
+          done();
+        });
+        bucket.update('thing', data);
+      });
 
     });
 
@@ -247,6 +265,37 @@ describe('Channel', function(){
 
     });
 
+    it("should ignore 412 change errors", function(done) {
+      // if a change is sent and acknowledged with a 412, change should be dequeued and
+      // no error should be emitted
+      var change = {o: 'M', id: 'thing', ev: 2, ccid: 'abc', v: diff({}, {'hello': 'world'}) };
+
+      // channel should not emit error during this change
+      channel.on('error', function(e) {
+        done(e);
+      });
+
+      // add fake ghost
+      channel.store.put('thing', 1, {}).then(function() {
+
+        // change is acknowledged and cleared from the queue
+        channel.on('acknowledge', function(id, change) {
+          assert(!channel.localQueue.sent.thing);
+          done();
+        });
+
+        // listen for change to be sent
+        channel.localQueue.once('send', function() {
+          assert(channel.localQueue.sent.thing);
+          // send a 412 response
+          channel.handleMessage('c:' + JSON.stringify([{error: 412, id: 'thing', ccids:['abc']}]));
+
+        });
+        // queue up the change
+        channel.localQueue.queue(change);
+      });
+
+    });
   });
 
   // TODO: handle auth failures
