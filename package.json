@@ -1,25 +1,25 @@
 {
   "name": "simperium",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "A simperium client for node.js",
   "main": "./lib/simperium/index.js",
-  "repository" : {
-    "type" : "git",
-    "url" : "git://github.com/beaucollins/node-simperium.git"
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/beaucollins/node-simperium.git"
   },
   "scripts": {
     "test": "mocha test/**"
   },
   "author": "",
   "license": "BSD-2-Clause",
-  "dependencies" : {
-    "editor" : "*",
-    "node-promise" : "*",
-    "node-uuid" : "*",
-    "websocket" : "*",
-    "sqlite3" : "*"
+  "dependencies": {
+    "editor": "*",
+    "node-promise": "*",
+    "node-uuid": "*",
+    "websocket": "*",
+    "sqlite3": "*"
   },
   "devDependencies": {
-    "mocha" : "*"
+    "mocha": "*"
   }
 }
