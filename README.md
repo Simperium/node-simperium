@@ -1,6 +1,6 @@
 # Simperium Client library for Node.js
 
-[![Build Status](https://travis-ci.org/beaucollins/node-simperium.png)](https://travis-ci.org/beaucollins/node-simperium)
+[![Build Status](https://travis-ci.org/beaucollins/node-simperium.png)](https://travis-ci.org/automattic/node-simperium)
 
 
 Goal: To have a feature complete Simperium client using the websocket API and adaptable local storage layers.
