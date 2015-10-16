@@ -264,6 +264,43 @@ describe('Channel', function(){
         }]));
       });
 
+    });
+
+    it("should request revisions", function(done) {
+
+      var key = 'thing',
+          version = 8,
+          assertMessage = function(msg) {
+            var msg = parseMessage(msg),
+                versionMsg = msg.data.split('.');
+
+            assert.equal('e', msg.command);
+            assert.equal(key, versionMsg[0]);
+
+          };
+
+      store.index[key] = JSON.stringify({version: version, data: {title: "Hello world"}});
+
+      var requests = [];
+
+      channel.on('send', function(message) {
+        requests.push(message);
+        assertMessage(message);
+        if (requests.length == 8) {
+          for (var i = 0; i < 8; i++) {
+            var msg = 'e:' + key + '.' + (i+1),
+                body = JSON.stringify({title: "title: " + (i+1)});
+
+            channel.handleMessage(msg + "\n" + body);
+          }
+        }
+      });
+
+      bucket.getRevisions(key, function(err, revisions) {
+        if (err) return done(err);
+        assert.equal(8, revisions.length);
+        done();
+      });
 
     });
 
