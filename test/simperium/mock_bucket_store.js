@@ -19,7 +19,7 @@ BucketStore.prototype.get = function(id, callback) {
 BucketStore.prototype.update = function(id, object, callback) {
   this.objects[id] = object;
   process.nextTick(function() {
-    callback(null, object);
+    if (callback) callback(null, {id: id, data: object});
   });
 };
 
