@@ -135,7 +135,7 @@ function MockWebSocket(socket) {
 
   var self = this;
 
-  EventEmitter(this);
+  EventEmitter.call(this);
   var connection = this.connection = new EventEmitter();
 
   this.connection.sendUTF = function(message) {
