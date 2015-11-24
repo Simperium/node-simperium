@@ -8,7 +8,7 @@
     "url": "git://github.com/beaucollins/node-simperium.git"
   },
   "scripts": {
-    "test": "mocha test/**"
+    "test": "`npm bin`/mocha test/**/*_test.js"
   },
   "author": "",
   "license": "BSD-2-Clause",
