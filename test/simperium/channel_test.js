@@ -93,6 +93,24 @@ describe('Channel', function(){
 
   });
 
+  it('should emit index event when index complete', function(done) {
+    var page = "i:{\"index\":[{\"id\":\"objectid\",\"v\":1,\"d\":{\"title\":\"Hello World\"}}],\"current\":\"cv\"}";
+    channel.on('index', function(cv) {
+      assert.equal('cv', cv);
+      done();
+    });
+    channel.handleMessage(page);
+  });
+
+  it('should request next index page', function(done) {
+    var page = "i:{\"index\":[{\"id\":\"objectid\",\"v\":1,\"d\":{\"title\":\"Hello World\"}}],\"mark\":\"next-mark\",\"current\":\"cv\"}";
+    channel.on('send', function(msg) {
+      assert.equal(msg, "i:1:next-mark::10");
+      done();
+    });
+    channel.handleMessage(page);
+  });
+
   describe("with index", function() {
 
     beforeEach(function() {
