@@ -1,6 +1,6 @@
 {
   "name": "simperium",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "A simperium client for node.js",
   "main": "./lib/simperium/index.js",
   "repository": {
@@ -14,10 +14,10 @@
   "license": "BSD-2-Clause",
   "dependencies": {
     "editor": "*",
-    "node-promise": "*",
     "node-uuid": "*",
-    "websocket": "*",
-    "sqlite3": "*"
+    "promise": "^7.0.4",
+    "sqlite3": "*",
+    "websocket": "*"
   },
   "devDependencies": {
     "mocha": "*"

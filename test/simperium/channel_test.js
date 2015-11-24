@@ -43,7 +43,7 @@ describe('Channel', function(){
 
   it('should apply change', function(done){
 
-    var id      = 'object',
+    var id      = 'thingamajig',
         version = 1,
         data    = { content: 'Lol' },
         changes = [{ sv: version,
@@ -57,7 +57,6 @@ describe('Channel', function(){
                    }];
 
     channel.once('update', function(id, data){
-
       assert.equal(data.content, 'Lol');
 
       channel.once('update', function(id, data){
@@ -92,24 +91,6 @@ describe('Channel', function(){
 
     channel.onChanges(JSON.stringify([change1, change2, change3]));
 
-  });
-
-  it('should emit index event when index complete', function(done) {
-    var page = "i:{\"index\":[{\"id\":\"objectid\",\"v\":1,\"d\":{\"title\":\"Hello World\"}}],\"current\":\"cv\"}";
-    channel.on('index', function(cv) {
-      assert.equal('cv', cv);
-      done();
-    });
-    channel.handleMessage(page);
-  });
-
-  it('should request next index page', function(done) {
-    var page = "i:{\"index\":[{\"id\":\"objectid\",\"v\":1,\"d\":{\"title\":\"Hello World\"}}],\"mark\":\"next-mark\",\"current\":\"cv\"}";
-    channel.on('send', function(msg) {
-      assert.equal(msg, "i:1:next-mark::10");
-      done();
-    });
-    channel.handleMessage(page);
   });
 
   describe("with index", function() {
@@ -268,11 +249,7 @@ describe('Channel', function(){
 
     it("should notify bucket after network deletion", function(done) {
 
-      bucket.update('object', {title: "hello world"}, function(e, object) {
-        channel.handleMessage('c:' + JSON.stringify([{
-          o: '-', ev: 1, cv: 'cv1', id: 'object'
-        }]));
-      });
+      var key = "deleteTest";
 
       bucket.on('remove', function(id) {
         bucket.get(id, function(e, id, object) {
@@ -280,6 +257,80 @@ describe('Channel', function(){
           done();
         });
       });
+
+      bucket.update(key, {title: "hello world"}, function(e, object) {
+        channel.handleMessage('c:' + JSON.stringify([{
+          o: '-', ev: 1, cv: 'cv1', id: key
+        }]));
+      });
+
+    });
+
+    it("should request revisions", function(done) {
+
+      var key = 'thing',
+          version = 8,
+          assertMessage = function(msg) {
+            var msg = parseMessage(msg),
+                versionMsg = msg.data.split('.');
+
+            assert.equal('e', msg.command);
+            assert.equal(key, versionMsg[0]);
+
+          };
+
+      store.index[key] = JSON.stringify({version: version, data: {title: "Hello world"}});
+
+      var requests = [];
+
+      channel.on('send', function(message) {
+        requests.push(message);
+        assertMessage(message);
+        if (requests.length == 8) {
+          for (var i = 0; i < 8; i++) {
+            var msg = 'e:' + key + '.' + (i+1),
+                body = JSON.stringify({title: "title: " + (i+1)});
+
+            channel.handleMessage(msg + "\n" + body);
+          }
+        }
+      });
+
+      bucket.getRevisions(key, function(err, revisions) {
+        if (err) return done(err);
+        assert.equal(8, revisions.length);
+        done();
+      });
+
+    });
+
+    // If receiving a remote change while there are unsent local modifications,
+    // local changes should be rebased onto the new ghost and re-sent
+    it("should resolve applying patch to modified object", function(done) {
+
+      // add an item to the index
+      var key = 'hello',
+          current = { title: 'Hello world' },
+          remoteDiff = diff(current, { title: 'Hello kansas'});
+
+      store.index[key] = JSON.stringify({ version: 1, data: current });
+
+      // when the channel is updated, it should be the result of
+      // the local changes being rebased on top of changes coming from the
+      // network which should ultimately be "Goodbye kansas"
+      channel.on('update', function(key, data){
+        assert.equal(data.title, 'Goodbye kansas');
+        assert.equal(channel.localQueue.sent[key].v.title.v, "-5\t+Goodbye\t=7");
+        done();
+      });
+
+      // We receive a remote change from "Hello world" to "Hello kansas"
+      channel.handleMessage('c:' + JSON.stringify([{
+        o: 'M', ev: 2, sv: 1, cv: 'cv1', id: key, v: remoteDiff
+      }]));
+
+      // We're changing "Hello world" to "Goodbye world"
+      bucket.update(key, {title: 'Goodbye world'});
 
     });
 
@@ -336,13 +387,10 @@ describe('Channel', function(){
   describe('after authorizing', function() {
 
     beforeEach(function(next) {
-
       channel.once('send', function() {
         next();
       });
-
       channel.onConnect();
-
     });
 
     it('should request index', function(done) {
@@ -374,6 +422,28 @@ describe('Channel', function(){
         channel.handleMessage('auth:user@example.com');
       });
 
+    });
+
+    it('should emit index event when index complete', function(done) {
+      var page = "i:{\"index\":[{\"id\":\"objectid\",\"v\":1,\"d\":{\"title\":\"Hello World\"}}],\"current\":\"cv\"}";
+      channel.on('index', function(cv) {
+        assert.equal('cv', cv);
+        assert(!bucket.isIndexing);
+        done();
+      });
+      channel.handleMessage(page);
+    });
+
+    it('should request next index page', function(done) {
+      var page = "i:{\"index\":[{\"id\":\"objectid\",\"v\":1,\"d\":{\"title\":\"Hello World\"}}],\"mark\":\"next-mark\",\"current\":\"cv\"}";
+      channel.once('send', function(msg) {
+        channel.handleMessage(page);
+      });
+      bucket.once('indexing', function() {
+        assert(bucket.isIndexing);
+        done();
+      });
+      channel.handleMessage('auth:user@example.com');
     });
 
   });
