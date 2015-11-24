@@ -93,24 +93,6 @@ describe('Channel', function(){
 
   });
 
-  it('should emit index event when index complete', function(done) {
-    var page = "i:{\"index\":[{\"id\":\"objectid\",\"v\":1,\"d\":{\"title\":\"Hello World\"}}],\"current\":\"cv\"}";
-    channel.on('index', function(cv) {
-      assert.equal('cv', cv);
-      done();
-    });
-    channel.handleMessage(page);
-  });
-
-  it('should request next index page', function(done) {
-    var page = "i:{\"index\":[{\"id\":\"objectid\",\"v\":1,\"d\":{\"title\":\"Hello World\"}}],\"mark\":\"next-mark\",\"current\":\"cv\"}";
-    channel.on('send', function(msg) {
-      assert.equal(msg, "i:1:next-mark::10");
-      done();
-    });
-    channel.handleMessage(page);
-  });
-
   describe("with index", function() {
 
     beforeEach(function() {
@@ -405,13 +387,10 @@ describe('Channel', function(){
   describe('after authorizing', function() {
 
     beforeEach(function(next) {
-
       channel.once('send', function() {
         next();
       });
-
       channel.onConnect();
-
     });
 
     it('should request index', function(done) {
@@ -443,6 +422,28 @@ describe('Channel', function(){
         channel.handleMessage('auth:user@example.com');
       });
 
+    });
+
+    it('should emit index event when index complete', function(done) {
+      var page = "i:{\"index\":[{\"id\":\"objectid\",\"v\":1,\"d\":{\"title\":\"Hello World\"}}],\"current\":\"cv\"}";
+      channel.on('index', function(cv) {
+        assert.equal('cv', cv);
+        assert(!bucket.isIndexing);
+        done();
+      });
+      channel.handleMessage(page);
+    });
+
+    it('should request next index page', function(done) {
+      var page = "i:{\"index\":[{\"id\":\"objectid\",\"v\":1,\"d\":{\"title\":\"Hello World\"}}],\"mark\":\"next-mark\",\"current\":\"cv\"}";
+      channel.once('send', function(msg) {
+        channel.handleMessage(page);
+      });
+      bucket.once('indexing', function() {
+        assert(bucket.isIndexing);
+        done();
+      });
+      channel.handleMessage('auth:user@example.com');
     });
 
   });
