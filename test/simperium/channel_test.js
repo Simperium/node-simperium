@@ -322,10 +322,15 @@ describe('Channel', function(){
       // the local changes being rebased on top of changes coming from the
       // network which should ultimately be "Goodbye kansas"
       channel.on('update', function(key, data){
-        assert.equal(data.title, 'Goodbye kansas');
-        assert.equal(channel.localQueue.sent[key].v.title.v, "-5\t+Goodbye\t=7");
-        done();
+				setImmediate(function() {
+	        assert.equal(data.title, 'Goodbye kansas');
+				})
       });
+
+			channel.on('send', function() {
+				assert.equal(channel.localQueue.sent[key].v.title.v, "-5\t+Goodbye\t=7");
+				done();
+			});
 
       // We receive a remote change from "Hello world" to "Hello kansas"
       channel.handleMessage('c:' + JSON.stringify([{
