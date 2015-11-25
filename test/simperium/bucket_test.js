@@ -1,11 +1,10 @@
 var assert = require('assert');
-var Bucket = require('../../lib/simperium/bucket');
-var storeProvider = require('./mock_bucket_store');
-var util = require('util');
-var simperiumUtil = require('../../lib/simperium/util');
-var fn = simperiumUtil.fn;
-var format = util.format;
-var parseMessage = simperiumUtil.parseMessage;
+import Bucket from '../../lib/simperium/bucket'
+import storeProvider from './mock_bucket_store'
+import util from 'util'
+import { fn } from '../../lib/simperium/util'
+import { format } from 'util'
+import { parseMessage } from '../../lib/simperium/util'
 
 describe('Bucket', function(){
 
