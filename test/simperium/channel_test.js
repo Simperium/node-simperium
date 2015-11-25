@@ -377,12 +377,12 @@ describe( 'Channel', function() {
 			var cv = 'abcdefg';
 
 			channel.once( 'send', function( data ) {
-				setImmediate(function() {
+				setImmediate( function() {
 					var message = parseMessage( data );
 					assert.equal( 'cv', message.command );
 					assert.equal( cv, message.data );
 					done();
-				})
+				} )
 			} );
 
 			store.setChangeVersion( cv ).then( function() {
