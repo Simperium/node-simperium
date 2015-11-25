@@ -7,8 +7,8 @@
 		"node": true
 	},
 	"ecmaFeatures": {
-		"jsx": true,
-		"modules": true
+		"modules": true,
+		"experimentalObjectRestSpread": true
 	},
 	"plugins": [
 		"eslint-plugin-react"
