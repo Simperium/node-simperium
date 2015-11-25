@@ -3,6 +3,19 @@ import https from 'https'
 import assert from 'assert'
 import { EventEmitter } from 'events'
 
+if ( !Object.assign ) {
+	// Very naive polyfill for Object.assign for testing purposes
+	Object.assign = function() {
+		return [].slice.apply( arguments ).reduce( ( out, from ) => {
+			var x;
+			for ( x in from ) {
+				out[x] = from[x];
+			}
+			return out;
+		}, {} )
+	}
+}
+
 const requests = new EventEmitter();
 
 https.request = function( options, handler ) {
