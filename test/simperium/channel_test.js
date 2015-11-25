@@ -146,6 +146,10 @@ describe('Channel', function(){
 
       channel.on('send', fn.counts(1, checkSent));
 
+			channel.on('send', function() {
+				bucket.update(objectId, data2);
+			})
+
       channel.localQueue.on('wait', function(id){
         assert.equal(id, objectId);
         done();
@@ -153,7 +157,6 @@ describe('Channel', function(){
 
       objectId = '123456';
       bucket.update(objectId, data);
-      bucket.update(objectId, data2);
 
     });
 
