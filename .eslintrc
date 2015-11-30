@@ -10,9 +10,6 @@
 		"modules": true,
 		"experimentalObjectRestSpread": true
 	},
-	"plugins": [
-		"eslint-plugin-react"
-	],
 	"rules": {
 		"brace-style": [ 1, "1tbs" ],
 		// REST API objects include underscores
@@ -49,9 +46,6 @@
 		// Allows Chai `expect` expressions
 		"no-unused-expressions": 0,
 		"no-unused-vars": 1,
-		// Teach eslint about React+JSX
-		"react/jsx-uses-react": 1,
-		"react/jsx-uses-vars": 1,
 		// Allows function use before declaration
 		"no-use-before-define": [ 2, "nofunc" ],
 		// We split external, internal, module variables
