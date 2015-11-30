@@ -1,4 +1,4 @@
-import Auth from '../../lib/simperium/auth'
+import Auth from '../../src/simperium/auth'
 import https from 'https'
 import assert from 'assert'
 import { EventEmitter } from 'events'

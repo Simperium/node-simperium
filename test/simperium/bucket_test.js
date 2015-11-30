@@ -1,5 +1,5 @@
 import assert from 'assert'
-import Bucket from '../../lib/simperium/bucket'
+import Bucket from '../../src/simperium/bucket'
 import storeProvider from './mock_bucket_store'
 
 describe( 'Bucket', function() {

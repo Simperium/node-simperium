@@ -1,13 +1,13 @@
 /*eslint no-shadow: 0*/
-import Channel from '../../lib/simperium/channel'
+import Channel from '../../src/simperium/channel'
 import util from 'util'
-import { parseMessage } from '../../lib/simperium/util'
+import { parseMessage } from '../../src/simperium/util'
 import assert from 'assert'
-import { fn } from '../../lib/simperium/util'
-import jsondiff from '../../lib/simperium/jsondiff'
-import defaultGhostStoreProvider from '../../lib/simperium/ghost/default'
+import { fn } from '../../src/simperium/util'
+import jsondiff from '../../src/simperium/jsondiff'
+import defaultGhostStoreProvider from '../../src/simperium/ghost/default'
 import uuid from 'node-uuid'
-import Bucket from '../../lib/simperium/bucket'
+import Bucket from '../../src/simperium/bucket'
 import mockBucketStore from './mock_bucket_store'
 
 const differ = jsondiff()
@@ -393,9 +393,11 @@ describe( 'Channel', function() {
 		it( 'should emit index event when index complete', function( done ) {
 			var page = 'i:{"index":[{"id":"objectid","v":1,"d":{"title":"Hello World"}}],"current":"cv"}';
 			channel.on( 'index', function( cv ) {
-				assert.equal( 'cv', cv );
-				assert( !bucket.isIndexing );
-				done();
+				setImmediate( function() {
+					assert.equal( 'cv', cv );
+					assert( !bucket.isIndexing );
+					done();
+				} )
 			} );
 			channel.handleMessage( page );
 		} );
