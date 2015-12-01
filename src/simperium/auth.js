@@ -3,7 +3,6 @@ import User from './user'
 import { format, inherits } from 'util'
 import https from 'https'
 import url from 'url'
-import Promise from 'promise'
 
 const URL = 'https://auth.simperium.com/1';
 
