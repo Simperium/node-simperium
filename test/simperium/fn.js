@@ -1,4 +1,4 @@
-export { arglock, when, counts, debounce, times }
+export { when, counts, debounce, times }
 
 function when( check, fn ) {
 	var args = [].slice.call( arguments, 2 );
@@ -29,20 +29,6 @@ function counts( total, fn ) {
 		};
 
 	return when.apply( this, [counter, fn].concat( args ) );
-}
-
-function arglock() {
-	var slice = [].slice,
-		args = slice.apply( arguments ),
-		fn;
-
-	if ( args.length === 0 || typeof( args[0] ) !== 'function' ) throw new Error( 'first argument must be a function' );
-
-	fn = args.shift();
-
-	return function() {
-		return fn.apply( this, args.concat( slice.apply( arguments ) ) );
-	};
 }
 
 function times( count, fn ) {

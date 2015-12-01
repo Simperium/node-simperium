@@ -1,5 +1,5 @@
 import assert from 'assert'
-import * as fn from '../../src/simperium/util/fn'
+import * as fn from './fn'
 
 describe( 'util.fn', function() {
 	describe( 'when', function() {
@@ -67,28 +67,6 @@ describe( 'util.fn', function() {
 			assert.ok( debounced() );
 
 			assert.equal( count, 11 );
-		} );
-	} );
-
-	describe( 'arglock', function() {
-		it( 'should lock an argument', function() {
-			var add = function( a, b ) {
-					return a + b;
-				},
-				addToTwo = fn.arglock( add, 2 );
-
-			assert.equal( addToTwo( 1 ), 3 );
-		} );
-
-		it( 'should lock multiple arguments', function() {
-			var product = function( a, b ) {
-					return a * b;
-				},
-				double = fn.arglock( product, 2 ),
-				doubleDouble = fn.arglock( double, 2 );
-
-			assert.equal( double( 4 ), 8 );
-			assert.equal( doubleDouble(), 4 );
 		} );
 	} );
 } );
