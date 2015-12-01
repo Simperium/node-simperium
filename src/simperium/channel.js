@@ -2,7 +2,6 @@
 import { format, inherits } from 'util'
 import { EventEmitter } from 'events'
 import { parseMessage, parseVersionMessage, change as change_util } from './util'
-import { arglock } from './util/fn'
 import JSONDiff from './jsondiff'
 import uuid from 'node-uuid'
 
@@ -23,7 +22,7 @@ internal.updateChangeVersion = function( cv ) {
 // to the ghost object and notify.
 internal.changeObject = function( id, change ) {
 	// pull out the object from the store and apply the change delta
-	var applyChange = arglock( internal.performChange, change ).bind( this );
+	var applyChange = internal.performChange.bind( this, change );
 
 	this.networkQueue.queueFor( id ).add( function( done ) {
 		return applyChange().then( done );
@@ -58,12 +57,12 @@ internal.sendChange = function( data ) {
 };
 
 internal.diffAndSend = function( id, object ) {
-	var modify = arglock( internal.buildModifyChange, id, object ).bind( this );
+	var modify = internal.buildModifyChange.bind( this, id, object );
 	return this.store.get( id ).then( modify );
 };
 
 internal.removeAndSend = function( id, object ) {
-	var remove = arglock( internal.buildRemoveChange, id, object ).bind( this );
+	var remove = internal.buildRemoveChange.bind( this, id, object );
 	return this.store.get( id ).then( remove );
 };
 
@@ -97,9 +96,9 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 			this.localQueue.queue( change );
 		}
 
-		notify = arglock( this.emit, 'update', id, update, original, patch, this.bucket.isIndexing ).bind( this );
+		notify = this.emit.bind( this, 'update', id, update, original, patch, this.bucket.isIndexing );
 	} else {
-		notify = arglock( internal.updateAcknowledged, acknowledged ).bind( this );
+		notify = internal.updateAcknowledged.bind( this, acknowledged );
 	}
 
 	return this.store.put( id, version, data ).then( notify );
@@ -108,9 +107,9 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 internal.removeObject = function( id, acknowledged ) {
 	var notify;
 	if ( !acknowledged ) {
-		notify = arglock( this.emit, 'remove', id ).bind( this );
+		notify = this.emit.bind( this, 'remove', id );
 	} else {
-		notify = arglock( internal.updateAcknowledged, acknowledged ).bind( this );
+		notify = internal.updateAcknowledged.bind( this, acknowledged );
 	}
 
 	return this.store.remove( id ).then( notify );
@@ -125,7 +124,7 @@ internal.updateAcknowledged = function( change ) {
 };
 
 internal.performChange = function( change ) {
-	var success = arglock( internal.applyChange, change ).bind( this );
+	var success = internal.applyChange.bind( this, change );
 	return this.store.get( change.id ).then( success );
 };
 
@@ -161,7 +160,7 @@ internal.applyChange = function( change, ghost ) {
 		return;
 	}
 
-	emit = arglock( this.emit, 'change-version', change.cv, change ).bind( this );
+	emit = this.emit.bind( this, 'change-version', change.cv, change );
 
 	if ( change.o === operation.MODIFY ) {
 		if ( ghost && ( ghost.version !== change.sv ) ) {
@@ -289,7 +288,7 @@ Channel.prototype.send = function( data ) {
 };
 
 Channel.prototype.onReload = function() {
-	var emit = arglock( this.emit, 'update' ).bind( this );
+	var emit = this.emit.bind( this, 'update' );
 	this.store.eachGhost( function( ghost ) {
 		emit( ghost.key, ghost.data );
 	} );
@@ -511,7 +510,7 @@ LocalQueue.prototype.dequeueChangesFor = function( id ) {
 
 LocalQueue.prototype.processQueue = function( id ) {
 	var queue = this.queues[id];
-	var compressAndSend = arglock( this.compressAndSend, id ).bind( this );
+	var compressAndSend = this.compressAndSend.bind( this, id );
 
 	// there is no queue, don't do anything
 	if ( !queue ) return;

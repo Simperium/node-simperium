@@ -2,7 +2,6 @@ import { format, inherits } from 'util'
 import { EventEmitter } from 'events'
 import Bucket from './bucket'
 import Channel from './channel'
-import { arglock } from './util/fn'
 import defaultGhostStoreProvider from './ghost/default'
 import defaultObjectStoreProvider from './storage/default'
 
@@ -54,10 +53,10 @@ inherits( Client, EventEmitter );
 
 Client.prototype.bucket = function( name ) {
 	var channelId = this.buckets.length,
-		bucket		= new Bucket( name, this.options.objectStoreProvider ),
-		channel		= new Channel( this.appId, this.accessToken, bucket, this.options.ghostStoreProvider( bucket ) ),
-		send			= arglock( this.sendChannelMessage, channelId ).bind( this ),
-		receive		= channel.handleMessage.bind( channel );
+		bucket = new Bucket( name, this.options.objectStoreProvider ),
+		channel = new Channel( this.appId, this.accessToken, bucket, this.options.ghostStoreProvider( bucket ) ),
+		send = this.sendChannelMessage.bind( this, channelId ),
+		receive = channel.handleMessage.bind( channel );
 
 	this.buckets.push( bucket );
 
