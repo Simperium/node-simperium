@@ -16,12 +16,10 @@
   "dependencies": {
     "babel-core": "^6.2.1",
     "babel-preset-es2015": "^6.1.18",
-    "editor": "*",
     "find": "^0.2.3",
-    "node-uuid": "*",
+    "node-uuid": "^1.4.7",
     "promise": "^7.0.4",
-    "sqlite3": "*",
-    "websocket": "*"
+    "websocket": "^1.0.22"
   },
   "devDependencies": {
     "mocha": "*"
