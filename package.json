@@ -2,7 +2,7 @@
   "name": "simperium",
   "version": "0.2.0",
   "description": "A simperium client for node.js",
-  "main": "./lib/simperium/index.js",
+  "main": "./src/simperium/index.js",
   "repository": {
     "type": "git",
     "url": "git://github.com/beaucollins/node-simperium.git"
