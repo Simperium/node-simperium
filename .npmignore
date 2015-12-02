@@ -1,6 +1,5 @@
 .eslintrc
 .eslintignore
-.babelrc
 examples/
 sample/
 .npmignore
