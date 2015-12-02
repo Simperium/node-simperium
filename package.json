@@ -9,11 +9,14 @@
   },
   "scripts": {
     "test": "`npm bin`/mocha --compilers js:babel-core/register test/**",
-    "prepublish": "eslint . && `npm bin`/babel -q -d lib/ src/"
+    "prepublish": "eslint . && `npm bin`/babel -q -d lib/ src/",
+    "postinstall": "node scripts/install.js"
   },
   "author": "",
   "license": "BSD-2-Clause",
   "dependencies": {
+    "babel-core": "^6.2.0",
+    "find": "^0.2.3",
     "node-uuid": "^1.4.7",
     "websocket": "^1.0.22"
   },
