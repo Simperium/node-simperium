@@ -1,7 +1,3 @@
-# ignore es6 code
-src/
-# no need to distribute tests
-test/
 .eslintrc
 .eslintignore
 .babelrc
