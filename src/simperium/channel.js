@@ -95,7 +95,6 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 			change = change_util.modify( id, version, patch );
 			this.localQueue.queue( change );
 		}
-
 		notify = this.emit.bind( this, 'update', id, update, original, patch, this.bucket.isIndexing );
 	} else {
 		notify = internal.updateAcknowledged.bind( this, acknowledged );

@@ -17,12 +17,11 @@ export default function Channel() {
 	const init = ( msg ) => {
 		onInit.call( this, msg, ( user_id, bucket ) => {
 			commands.removeListener( 'init', init )
-			bucket.on( 'change', () => {
-				// TODO: send the change back to the connection?
-			} )
+			bucket.on( 'change', onUpdate.bind( this ) )
 			commands
 				.on( 'i', onIndex.bind( this, bucket ) )
 				.on( 'cv', onChangeVersion.bind( this, bucket ) )
+				.on( 'c', onChange.bind( this, bucket ) )
 		} )
 	}
 	commands.on( 'init', init )
@@ -64,5 +63,27 @@ function onIndex( bucket, index ) {
 }
 
 function onChangeVersion( bucket, cv ) {
-	this.send( 'cv:?' )
+	bucket.changesSince( cv, ( error, changes ) => {
+		if ( error ) {
+			return this.send( 'cv:?' );
+		}
+		this.send( 'c:' + JSON.stringify( changes ) )
+	} )
+}
+
+function onChange( bucket, changeMsg ) {
+	var change;
+	try {
+		change = JSON.parse( changeMsg )
+	} catch ( e ) {
+		return this.send( 'c:?' )
+	}
+	bucket.applyChange( change, ( e ) => {
+		// TODO: respond with change errors
+		throw( e )
+	} )
+}
+
+function onUpdate( change ) {
+	this.send( 'c:' + JSON.stringify( [ change ] ) );
 }
