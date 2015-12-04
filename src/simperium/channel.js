@@ -189,6 +189,16 @@ internal.handleChangeError = function( err, change, acknowledged ) {
 	}
 }
 
+internal.indexingComplete = function() {
+	// Indexing has finished
+	this.bucket.isIndexing = false;
+	this.emit( 'index', this.index_cv );
+
+	this.index_last_id = null;
+	this.index_cv = null;
+	this.bucket.removeListener( 'update', this.bucketUpdateListener );
+}
+
 export default function Channel( appid, access_token, bucket, store ) {
 	var channel = this;
 	var message = this.message = new EventEmitter();
@@ -298,13 +308,7 @@ Channel.prototype.onBucketUpdate = function( noteId ) {
 	if ( this.index_last_id == null || this.index_cv == null ) {
 		return;
 	} else if ( this.index_last_id === noteId ) {
-		// Indexing has finished
-		this.bucket.isIndexing = false;
-		this.emit( 'index', this.index_cv );
-
-		this.index_last_id = null;
-		this.index_cv = null;
-		this.bucket.removeListener( 'update', this.bucketUpdateListener );
+		internal.indexingComplete.call( this );
 	}
 };
 
@@ -362,7 +366,12 @@ Channel.prototype.onIndex = function( data ) {
 	} );
 
 	if ( !mark ) {
-		this.index_last_id = objectId;
+		if ( objectId ) {
+			this.index_last_id = objectId;
+		}
+		if ( !this.index_last_id ) {
+			internal.indexingComplete.call( this )
+		}
 		this.index_cv = cv;
 	} else {
 		this.sendIndexRequest( mark );
