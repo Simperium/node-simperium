@@ -1,13 +1,13 @@
 /*eslint no-shadow: 0*/
-import Channel from '../../src/simperium/channel'
+import Channel from 'simperium/channel'
+import { parseMessage } from 'simperium/util'
+import jsondiff from 'simperium/jsondiff'
+import defaultGhostStoreProvider from 'simperium/ghost/default'
+import Bucket from 'simperium/bucket'
 import util from 'util'
-import { parseMessage } from '../../src/simperium/util'
 import assert, { equal, ok } from 'assert'
 import * as fn from './fn'
-import jsondiff from '../../src/simperium/jsondiff'
-import defaultGhostStoreProvider from '../../src/simperium/ghost/default'
 import uuid from 'node-uuid'
-import Bucket from '../../src/simperium/bucket'
 import mockBucketStore from './mock_bucket_store'
 
 const differ = jsondiff()

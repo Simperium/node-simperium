@@ -8,7 +8,7 @@
     "url": "git://github.com/Simperium/node-simperium.git"
   },
   "scripts": {
-    "test": "mocha --compilers js:babel-core/register test/**",
+    "test": "NODE_PATH=src mocha --compilers js:babel-core/register test/**/**",
     "prepublish": "babel -q -d lib/ src/"
   },
   "author": "",
