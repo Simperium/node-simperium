@@ -14,22 +14,25 @@ export default function Channel() {
 	// TODO: buckets shouldn't handle init commands themselves
 	// a bucket instance represents a single connection from a client to
 	// a server
-	commands
-	.on( 'init', ( msg ) => {
-		this.onInit( msg, ( user_id, bucket ) => {
+	const init = ( msg ) => {
+		onInit.call( this, msg, ( user_id, bucket ) => {
+			commands.removeListener( 'init', init )
 			bucket.on( 'change', () => {
 				// TODO: send the change back to the connection?
 			} )
-			commands.on( 'i', this.onIndex.bind( this, bucket ) )
+			commands
+				.on( 'i', onIndex.bind( this, bucket ) )
+				.on( 'cv', onChangeVersion.bind( this, bucket ) )
 		} )
-	} )
+	}
+	commands.on( 'init', init )
 
 	this.send = this.emit.bind( this, 'send' );
 }
 
 inherits( Channel, EventEmitter );
 
-Channel.prototype.onInit = function( initMsg, onAuthorized ) {
+function onInit( initMsg, onAuthorized ) {
 	var params;
 	try {
 		params = JSON.parse( initMsg );
@@ -49,7 +52,7 @@ Channel.prototype.onInit = function( initMsg, onAuthorized ) {
 	} )
 }
 
-Channel.prototype.onIndex = function( bucket, index ) {
+function onIndex( bucket, index ) {
 	const [includeData, mark, _, count] = index.split( ':' )
 	bucket.queryIndex( mark, count, ( current, nextMark, objects ) => {
 		var i = { current: current, index: objects };
@@ -58,4 +61,8 @@ Channel.prototype.onIndex = function( bucket, index ) {
 		}
 		this.send( 'i:' + JSON.stringify( i ) )
 	} )
+}
+
+function onChangeVersion( bucket, cv ) {
+	this.send( 'cv:?' )
 }

@@ -5,6 +5,7 @@ import assert from 'assert'
 import mockBucketStore from '../mock_bucket_store'
 import EventEmitter from 'events'
 import { inherits } from 'util'
+import * as fn from '../fn'
 
 const successAuthorizer = ( email, bucket ) => {
 	return ( token, fn ) => {
@@ -38,19 +39,20 @@ describe( 'Server', function() {
 	} )
 
 	describe( 'after authorized', function() {
-		var connection, authorize;
+		var connection, authorize, log;
 
 		beforeEach( () => {
+			log = false;
 			connection = buildClientChannel();
 			channel.authorizer = successAuthorizer( 'user@example.com', mockBucket() )
 
 			channel.on( 'send', ( msg ) => {
-				// console.log( 'client', '<=', msg );
+				if ( log ) console.log( 'client', '<=', msg );
 				connection.handleMessage( msg );
 			} )
 
 			connection.on( 'send', ( msg ) => {
-				// console.log( 'server', '<=', msg );
+				if ( log ) console.log( 'server', '<=', msg );
 				channel.receiveMessage( msg )
 			} )
 		} )
@@ -60,17 +62,30 @@ describe( 'Server', function() {
 			connection.onConnect();
 		}
 
-		it( 'should respond to index request with empty index', function( done ) {
+		it( 'should respond to index request with empty index', ( done ) => {
 			connection.bucket.on( 'index', () => {
 				done()
 			} )
 			authorize()
 		} )
 
-		it( 'should respond to index request with multipage index', function( done ) {
+		it( 'should respond to index request with multipage index', ( done ) => {
 			channel.authorizer = successAuthorizer( 'user@example.com', mockBucket( '100s', mockIndexData( 100 ) ) )
 			connection.bucket.on( 'index', () => {
 				done()
+			} )
+			authorize()
+		} )
+
+		it( 'should respond to unknown cv request with ?', ( done ) => {
+			log = true
+			// populate the client's bucket with a cv
+			connection.store.cv = 'notearealcv'
+			channel.on( 'authorized', () => {
+				channel.on( 'send', fn.counts(1, ( msg ) => {
+					assert.equal( msg, 'cv:?' )
+					done()
+				} ) )
 			} )
 			authorize()
 		} )
