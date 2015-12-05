@@ -50,7 +50,7 @@ function onInit( initMsg, onAuthorized ) {
 }
 
 function onIndex( bucket, index ) {
-	const [includeData, mark, _, count] = index.split( ':' )
+	const [, mark, , count] = index.split( ':' )
 	bucket.queryIndex( mark, count, ( current, nextMark, objects ) => {
 		var i = { current: current, index: objects };
 		if ( nextMark ) {
