@@ -10,9 +10,9 @@ BucketStore.prototype.get = function( id, callback ) {
 	callback( null, {id: id, data: this.objects[id]} );
 };
 
-BucketStore.prototype.update = function( id, object, isIndexing, callback ) {
+BucketStore.prototype.update = function( id, object, callback ) {
 	this.objects[id] = object;
-	callback( null, {id: id, data: object, isIndexing: isIndexing} );
+	callback( null, {id: id, data: object} );
 };
 
 BucketStore.prototype.remove = function( id, callback ) {
