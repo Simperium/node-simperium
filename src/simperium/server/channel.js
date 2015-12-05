@@ -6,7 +6,7 @@ export default function Channel() {
 	EventEmitter.call( this );
 	const commands = new EventEmitter();
 
-	this.receiveMessage = function( msg ) {
+	this.receive = this.receiveMessage = function( msg ) {
 		const { command, data } = parseMessage( msg );
 		commands.emit( command, data );
 	}
@@ -39,9 +39,7 @@ function onInit( initMsg, onAuthorized ) {
 		this.send( 'auth:{"error":"' + error + '"}' )
 	}
 
-	const token = { params }
-
-	this.authorizer( token, ( error, user_id, bucket ) => {
+	this.authorizer( params, ( error, user_id, bucket ) => {
 		if ( error ) {
 			return this.send( 'auth:{"error":"failed"}' )
 		}
