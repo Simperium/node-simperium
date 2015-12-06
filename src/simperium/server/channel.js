@@ -78,7 +78,7 @@ function onChange( bucket, changeMsg ) {
 	}
 	bucket.applyChange( change, ( e ) => {
 		// TODO: respond with change errors
-		throw( e )
+		console.error( 'Failed to apply change', e )
 	} )
 }
 
