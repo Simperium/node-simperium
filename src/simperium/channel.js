@@ -229,8 +229,8 @@ export default function Channel( appid, access_token, bucket, store ) {
 	this.on( 'index', function( cv ) {
 		internal.updateChangeVersion.call( channel, cv ).then( function() {
 			channel.localQueue.start();
+			bucket.emit( 'index' );
 		} );
-		bucket.emit( 'index' );
 	} );
 
 	// forward errors to bucket instance
