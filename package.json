@@ -9,7 +9,7 @@
   },
   "scripts": {
     "test": "`npm bin`/mocha --compilers js:babel-core/register test/**",
-    "prepublish": "eslint . && `npm bin`/babel -q -d lib/ src/",
+    "prepublish": "`npm bin`/babel -q -d lib/ src/",
     "postinstall": "node scripts/install.js"
   },
   "author": "",
