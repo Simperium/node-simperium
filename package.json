@@ -16,8 +16,7 @@
     "editor": "*",
     "node-promise": "*",
     "node-uuid": "*",
-    "websocket": "*",
-    "sqlite3": "*"
+    "websocket": "*"
   },
   "devDependencies": {
     "mocha": "*"
