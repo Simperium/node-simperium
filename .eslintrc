@@ -23,6 +23,7 @@
 		"eol-last": 1,
 		"indent": [ 1, "tab", { "SwitchCase": 1 } ],
 		"key-spacing": 1,
+		"keyword-spacing": [ 1 ],
 		// Most common is "Emitter", should be improved
 		"new-cap": 1,
 		"no-cond-assign": 2,
@@ -58,7 +59,6 @@
 		"quote-props": [ 1, "as-needed" ],
 		"quotes": [ 1, "single", "avoid-escape" ],
 		"semi-spacing": 1,
-		"space-after-keywords": [ 1, "always" ],
 		"space-before-blocks": [ 1, "always" ],
 		"space-before-function-paren": [ 1, "never" ],
 		// Our array literal index exception violates this rule
