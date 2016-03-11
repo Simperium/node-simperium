@@ -40,7 +40,13 @@ Auth.prototype.request = function( endpoint, body ) {
 			} );
 
 			res.on( 'end', () => {
-				var user = User.fromJSON( responseData );
+				var user;
+
+				try {
+					user = User.fromJSON( responseData );
+				} catch ( e ) {
+					return reject( new Error( responseData ) );
+				}
 				this.emit( 'authorize', user );
 				resolve( user );
 			} );

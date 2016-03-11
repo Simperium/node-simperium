@@ -1,36 +1,25 @@
 import Auth from '../../src/simperium/auth'
 import https from 'https'
-import assert from 'assert'
+import { equal, deepEqual } from 'assert'
 import { EventEmitter } from 'events'
 
-if ( !Object.assign ) {
-	// Very naive polyfill for Object.assign for testing purposes
-	Object.assign = function() {
-		return [].slice.apply( arguments ).reduce( ( out, from ) => {
-			var x;
-			for ( x in from ) {
-				out[x] = from[x];
-			}
-			return out;
-		}, {} )
+const stub = ( respond ) => {
+	https.request = ( options, handler ) => {
+		const req = new EventEmitter()
+		req.end = ( body ) => respond( body, handler )
+		return req
 	}
 }
 
-const requests = new EventEmitter();
-
-https.request = function( options, handler ) {
-	requests.emit( 'opened', options, handler );
-	const req = new EventEmitter();
-
-	req.end = function( msg ) {
-		requests.emit( 'body', msg, handler );
-	}
-
-	return req;
-}
+const stubResponse = ( data ) => stub( ( body, handler ) => {
+	const response = new EventEmitter()
+	handler( response )
+	response.emit( 'data', data )
+	response.emit( 'end' )
+} )
 
 describe( 'Auth', () => {
-	var auth;
+	var auth
 
 	beforeEach( () => {
 		auth = new Auth( 'token', 'secret' );
@@ -38,23 +27,18 @@ describe( 'Auth', () => {
 
 	it( 'getUrlOptions', () => {
 		const { hostname, headers, pathname, method } = auth.getUrlOptions( 'path' )
-		assert.equal( method, 'POST' )
-		assert.equal( hostname, 'auth.simperium.com' )
-		assert.equal( pathname, '/1/token/path' )
-		assert.deepEqual( headers, { 'X-Simperium-API-Key': 'secret' } )
+		equal( method, 'POST' )
+		equal( hostname, 'auth.simperium.com' )
+		equal( pathname, '/1/token/path' )
+		deepEqual( headers, { 'X-Simperium-API-Key': 'secret' } )
 	} )
 
 	it( 'should request auth token', ( done ) => {
-		requests.on( 'opened', ( options ) => {
-			const { pathname } = options;
-			assert.equal( pathname, '/1/token/authorize/' )
-		} )
-
-		requests.on( 'body', ( data, handler ) => {
+		stub( ( data, handler ) => {
 			const { username, password } = JSON.parse( data )
 			const response = new EventEmitter()
-			assert.equal( username, 'username' )
-			assert.equal( password, 'password' )
+			equal( username, 'username' )
+			equal( password, 'password' )
 
 			handler( response )
 			response.emit( 'data', '{\"access_token\": \"secret-token\"}' )
@@ -63,9 +47,18 @@ describe( 'Auth', () => {
 
 		auth.authorize( 'username', 'password' )
 		.then( ( user ) => {
-			assert.equal( user.access_token, 'secret-token' )
+			equal( user.access_token, 'secret-token' )
 			done()
 		} )
-		.catch( done )
+	} )
+
+	it( 'should fail to auth with invalid credentials', ( done ) => {
+		stubResponse( 'this is not json' )
+
+		auth.authorize( 'username', 'bad-password' )
+		.catch( ( e ) => {
+			equal( e.message, 'this is not json' )
+			done()
+		} )
 	} )
 } )
