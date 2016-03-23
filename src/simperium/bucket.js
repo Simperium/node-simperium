@@ -28,7 +28,7 @@ Bucket.prototype.update = function( id, data, options, callback ) {
 	if ( typeof options === 'function' ) {
 		callback = options;
 	}
-	return this.store.update( id, data, callback );
+	return this.store.update( id, data, this.isIndexing, callback );
 };
 
 Bucket.prototype.touch = function( id, callback ) {
