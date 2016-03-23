@@ -15,10 +15,10 @@ BucketStore.prototype.get = function( id, callback ) {
 	} );
 };
 
-BucketStore.prototype.update = function( id, object, callback ) {
+BucketStore.prototype.update = function( id, object, isIndexing, callback ) {
 	this.objects[id] = object;
 	process.nextTick( function() {
-		if ( callback ) callback( null, {id: id, data: object} );
+		if ( callback ) callback( null, {id: id, data: object, isIndexing: isIndexing} );
 	} );
 };
 
