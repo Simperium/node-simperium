@@ -34,6 +34,18 @@ describe( 'Bucket', function() {
 		} );
 	} );
 
+	it( 'should update with options', function( done ) {
+		var id = 'thing',
+			object = {one: 'two'}
+
+		bucket.update( id, object, {}, function() {
+			bucket.get( id, function( err, savedObject ) {
+				assert.deepEqual( object, savedObject );
+				done();
+			} )
+		} )
+	} );
+
 	it( 'should delete object data', function( done ) {
 		store.objects = {
 			hello: {title: 'hola mundo'}
