@@ -1,7 +1,10 @@
 .eslintrc
 .eslintignore
+.babelrc
 examples/
 sample/
+src/
+test/
 .npmignore
 .travis.yml
 *.tgz

@@ -9,8 +9,7 @@
   },
   "scripts": {
     "test": "mocha --compilers js:babel-core/register test/**",
-    "prepublish": "babel -q -d lib/ src/",
-    "postinstall": "node scripts/install.js"
+    "prepublish": "babel -q -d lib/ src/"
   },
   "author": "",
   "license": "BSD-2-Clause",
