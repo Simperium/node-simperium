@@ -152,7 +152,7 @@ internal.applyChange = function( change, ghost ) {
 	//	 clientid: 'node-b9776e96-c068-42ae-893a-03f50833bddb',
 	//	 error: 400 }
 	if ( change.error ) {
-		error = new Error( 'Could not apply change to ' + ghost.key );
+		error = new Error( `${change.error} - Could not apply change to: ${ghost.key}` );
 		error.code = change.error;
 		error.change = change;
 		error.ghost = ghost;
@@ -231,6 +231,9 @@ export default function Channel( appid, access_token, bucket, store ) {
 		} );
 		bucket.emit( 'index' );
 	} );
+
+	// forward errors to bucket instance
+	this.on( 'error', bucket.emit.bind( bucket, 'error' ) )
 
 	bucket.update = function( id, object, options, callback ) {
 		if ( typeof options === 'function' ) {

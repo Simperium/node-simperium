@@ -35,6 +35,7 @@ Store.prototype.get = function( id ) {
 			var ghost = this.index[id];
 			if ( !ghost ) {
 				ghost = {data: {}};
+				ghost.key = id;
 				this.index[id] = JSON.stringify( ghost );
 			} else {
 				ghost = JSON.parse( ghost );
