@@ -2,7 +2,7 @@
 import Channel from '../../src/simperium/channel'
 import util from 'util'
 import { parseMessage } from '../../src/simperium/util'
-import assert from 'assert'
+import assert, { equal } from 'assert'
 import * as fn from './fn'
 import jsondiff from '../../src/simperium/jsondiff'
 import defaultGhostStoreProvider from '../../src/simperium/ghost/default'
@@ -307,6 +307,18 @@ describe( 'Channel', function() {
 
 			// We're changing "Hello world" to "Goodbye world"
 			bucket.update( key, {title: 'Goodbye world'} );
+		} );
+
+		it( 'should emit errors on the bucket instance', function( done ) {
+			const error = {error: 404, id: 'thing', ccids: ['abc']}
+			bucket.on( 'error', ( e ) => {
+				process.nextTick( () => {
+					equal( 404, e.code )
+					equal( `${ e.code } - Could not apply change to: ${error.id}`, e.message )
+					done()
+				} )
+			} )
+			channel.handleMessage( 'c:' + JSON.stringify( [ error ] ) );
 		} );
 
 		it( 'should ignore 412 change errors', function( done ) {
