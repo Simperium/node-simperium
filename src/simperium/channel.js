@@ -323,6 +323,9 @@ Channel.prototype.onAuth = function( data ) {
 		this.emit( 'unauthorized', auth );
 		return;
 	} catch ( error ) {
+		// Clear any unacknowledged changes on reconnect
+		this.localQueue.sent = {};
+
 		// request cv and then send method
 		init = function( cv ) {
 			if ( cv ) {
