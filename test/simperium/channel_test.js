@@ -172,7 +172,7 @@ describe( 'Channel', function() {
 					channel.handleMessage( 'i:{"index":[],"current":"cv"}' )
 				} ),
 				m => setImmediate( () => {
-					equal( m, 'c:{"fake":"change","ccid":"fake-ccid"}')
+					equal( m, 'c:{"fake":"change","ccid":"fake-ccid"}' )
 					resolve()
 				} )
 			) )
