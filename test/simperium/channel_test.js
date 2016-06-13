@@ -2,7 +2,7 @@
 import Channel from '../../src/simperium/channel'
 import util from 'util'
 import { parseMessage } from '../../src/simperium/util'
-import assert, { equal } from 'assert'
+import assert, { equal, ok } from 'assert'
 import * as fn from './fn'
 import jsondiff from '../../src/simperium/jsondiff'
 import defaultGhostStoreProvider from '../../src/simperium/ghost/default'
@@ -12,6 +12,11 @@ import mockBucketStore from './mock_bucket_store'
 
 const differ = jsondiff()
 const diff = differ.object_diff.bind( differ )
+const cycle = ( ... fns ) => ( ... args ) => {
+	const [ head, ... rest ] = fns
+	head( ... args )
+	fns = rest.concat( head )
+}
 
 describe( 'Channel', function() {
 	var channel, bucket, store;
@@ -158,6 +163,21 @@ describe( 'Channel', function() {
 			bucket.update( 'mock-id', data );
 		} );
 
+		it( 'should resend sent but unacknowledged changes on reconnect', () => new Promise( resolve => {
+			channel.localQueue.sent['fake-ccid'] = { fake: 'change' }
+
+			channel.on( 'send', cycle(
+				() => channel.handleMessage( 'i:{"index":[],"current":"cv"}'),
+				m => {
+					resolve()
+				}
+			) )
+
+			channel.handleMessage( 'auth:user@example.com' )
+			
+			channel.emit( 'ready' )
+		} ) )
+
 		it( 'should send remove operation', function( done ) {
 			channel.on( 'send', function( msg ) {
 				var message = parseMessage( msg ),
@@ -220,6 +240,11 @@ describe( 'Channel', function() {
 
 			channel.handleMessage( 'c:' + JSON.stringify( [change] ) );
 		} );
+
+		it( 'should emit ready after receiving changes', ( done ) => {
+			channel.on( 'ready', () => done() )
+			channel.handleMessage( 'c:[]' );
+		} )
 
 		it( 'should notify bucket after network deletion', function( done ) {
 			var key = 'deleteTest';
@@ -366,12 +391,10 @@ describe( 'Channel', function() {
 	} );
 
 	describe( 'after authorizing', function() {
-		beforeEach( function( next ) {
-			channel.once( 'send', function() {
-				next();
-			} );
+		beforeEach( () => new Promise( resolve => {
+			channel.once( 'send', () => resolve() );
 			channel.onConnect();
-		} );
+		} ) );
 
 		it( 'should request index', function( done ) {
 			channel.once( 'send', function( data ) {
@@ -402,17 +425,20 @@ describe( 'Channel', function() {
 			} );
 		} );
 
-		it( 'should emit index event when index complete', function( done ) {
+		it( 'should emit index and ready event when index complete', () => new Promise( resolve => {
 			var page = 'i:{"index":[{"id":"objectid","v":1,"d":{"title":"Hello World"}}],"current":"cv"}';
+			let indexed = false
 			channel.on( 'index', function( cv ) {
-				setImmediate( function() {
-					assert.equal( 'cv', cv );
-					assert( !bucket.isIndexing );
-					done();
-				} )
+				assert.equal( 'cv', cv );
+				assert( !bucket.isIndexing );
+				indexed = true
 			} );
+			channel.on( 'ready', () => {
+				ok( indexed )
+				resolve()
+			} )
 			channel.handleMessage( page );
-		} );
+		} ) );
 
 		it( 'should request next index page', function( done ) {
 			var page = 'i:{"index":[{"id":"objectid","v":1,"d":{"title":"Hello World"}}],"mark":"next-mark","current":"cv"}';

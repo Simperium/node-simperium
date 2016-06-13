@@ -197,6 +197,7 @@ internal.indexingComplete = function() {
 	this.index_last_id = null;
 	this.index_cv = null;
 	this.bucket.removeListener( 'update', this.bucketUpdateListener );
+	this.emit( 'ready' )
 }
 
 export default function Channel( appid, access_token, bucket, store ) {
@@ -323,11 +324,11 @@ Channel.prototype.onAuth = function( data ) {
 		this.emit( 'unauthorized', auth );
 		return;
 	} catch ( error ) {
-		// Clear any unacknowledged changes on reconnect
-		this.localQueue.sent = {};
-
 		// request cv and then send method
-		init = function( cv ) {
+		this.once( 'ready', () => {
+			this.localQueue.resendSentChanges();
+		} )
+		init = ( cv ) => {
 			if ( cv ) {
 				this.localQueue.start();
 				this.sendChangeVersionRequest( cv );
@@ -338,7 +339,7 @@ Channel.prototype.onAuth = function( data ) {
 			}
 		};
 
-		this.store.getChangeVersion().then( init.bind( this ) );
+		this.store.getChangeVersion().then( init );
 
 		return;
 	}
@@ -400,6 +401,8 @@ Channel.prototype.onChanges = function( data ) {
 	changes.forEach( function( change ) {
 		onChange( change.id, change );
 	} );
+	// emit ready after all server changes have been applied
+	this.emit( 'ready' );
 }
 ;
 
@@ -588,6 +591,12 @@ LocalQueue.prototype.compressAndSend = function( id, ghost ) {
 
 	this.sent[id] = change;
 	this.emit( 'send', change );
+}
+
+LocalQueue.prototype.resendSentChanges = function() {
+	for ( let ccid in this.sent ) {
+		this.emit( 'send', this.sent[ccid] )
+	}
 }
 
 function collectionRevisions( channel, id, callback ) {
