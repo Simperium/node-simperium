@@ -164,18 +164,20 @@ describe( 'Channel', function() {
 		} );
 
 		it( 'should resend sent but unacknowledged changes on reconnect', () => new Promise( resolve => {
-			channel.localQueue.sent['fake-ccid'] = { fake: 'change' }
+			channel.localQueue.sent['fake-ccid'] = { fake: 'change', ccid: 'fake-ccid' }
 
 			channel.on( 'send', cycle(
-				() => channel.handleMessage( 'i:{"index":[],"current":"cv"}'),
-				m => {
+				m => setImmediate( () => {
+					equal( m, 'i:1:::10' )
+					channel.handleMessage( 'i:{"index":[],"current":"cv"}' )
+				} ),
+				m => setImmediate( () => {
+					equal( m, 'c:{"fake":"change","ccid":"fake-ccid"}')
 					resolve()
-				}
+				} )
 			) )
 
 			channel.handleMessage( 'auth:user@example.com' )
-			
-			channel.emit( 'ready' )
 		} ) )
 
 		it( 'should send remove operation', function( done ) {
