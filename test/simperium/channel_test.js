@@ -163,6 +163,13 @@ describe( 'Channel', function() {
 			bucket.update( 'mock-id', data );
 		} );
 
+		it( 'should ignore duplicate change error if nothing to acknowledge', ( done ) => {
+			let id = 'mock-id', ccid = 'mock-ccid'
+			// queue should emit a finish event when the change is processed
+			channel.networkQueue.queueFor( id ).on( 'finish', () => done() )
+			channel.handleMessage( 'c:' + JSON.stringify( [ { ccids: [ ccid ], error: 409, id }] ) )
+		} )
+
 		it( 'should resend sent but unacknowledged changes on reconnect', () => new Promise( resolve => {
 			channel.localQueue.sent['fake-ccid'] = { fake: 'change', ccid: 'fake-ccid' }
 
