@@ -25,7 +25,7 @@ internal.changeObject = function( id, change ) {
 	var applyChange = internal.performChange.bind( this, change );
 
 	this.networkQueue.queueFor( id ).add( function( done ) {
-		return applyChange().then( done );
+		return applyChange().then( done, done );
 	} );
 };
 
