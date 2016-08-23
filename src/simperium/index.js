@@ -1,10 +1,10 @@
 import User from './user'
 import Client from './client'
 import Auth from './auth'
+import Bucket from './bucket'
+import Channel from './channel'
 import * as util from './util'
 
-export default function( appId, token, options ) {
-	return new Client( appId, token, options );
-}
+export default ( appId, token, options ) => new Client( appId, token, options )
 
-export { Auth, User, Client, util }
+export { Auth, User, Client, util, Bucket, Channel }

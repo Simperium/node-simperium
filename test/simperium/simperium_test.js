@@ -1,4 +1,4 @@
-import { util } from '../../src/simperium'
+import { util } from 'simperium'
 import assert from 'assert'
 
 describe( 'Simperium', () => {

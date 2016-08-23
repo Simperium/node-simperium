@@ -2,7 +2,7 @@ import assert from 'assert'
 import Bucket from '../../src/simperium/bucket'
 import defaultStore from '../../src/simperium/storage/default'
 
-describe( 'default store', function() {
+describe( 'Default store', function() {
 	var bucket;
 
 	beforeEach( function() {

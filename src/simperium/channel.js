@@ -95,7 +95,6 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 			change = change_util.modify( id, version, patch );
 			this.localQueue.queue( change );
 		}
-
 		notify = this.emit.bind( this, 'update', id, update, original, patch, this.bucket.isIndexing );
 	} else {
 		notify = internal.updateAcknowledged.bind( this, acknowledged );
@@ -219,6 +218,7 @@ export default function Channel( appid, access_token, bucket, store ) {
 	message.on( 'c', this.onChanges.bind( this ) );
 	message.on( 'e', this.onVersion.bind( this ) );
 	message.on( 'o', function() {} );
+	message.on( 'cv', this.onChangeVersion.bind( this ) );
 
 	this.networkQueue = new NetworkQueue();
 	this.localQueue = new LocalQueue( this.store );
@@ -229,8 +229,8 @@ export default function Channel( appid, access_token, bucket, store ) {
 	this.on( 'index', function( cv ) {
 		internal.updateChangeVersion.call( channel, cv ).then( function() {
 			channel.localQueue.start();
+			bucket.emit( 'index' );
 		} );
-		bucket.emit( 'index' );
 	} );
 
 	// forward errors to bucket instance
@@ -293,6 +293,7 @@ inherits( Channel, EventEmitter );
 
 Channel.prototype.handleMessage = function( data ) {
 	var message = parseMessage( data );
+	this.emit( 'receive', data )
 
 	this.message.emit( message.command, message.data );
 };
@@ -333,9 +334,7 @@ Channel.prototype.onAuth = function( data ) {
 				this.localQueue.start();
 				this.sendChangeVersionRequest( cv );
 			} else {
-				this.bucket.isIndexing = true;
-				this.bucket.emit( 'indexing' );
-				this.sendIndexRequest();
+				this.startIndexing();
 			}
 		};
 
@@ -386,6 +385,12 @@ Channel.prototype.onIndex = function( data ) {
 }
 ;
 
+Channel.prototype.startIndexing = function() {
+	this.bucket.isIndexing = true;
+	this.bucket.emit( 'indexing' );
+	this.sendIndexRequest();
+}
+
 Channel.prototype.sendIndexRequest = function( mark ) {
 	this.send( format( 'i:1:%s::10', mark ? mark : '' ) );
 };
@@ -404,7 +409,13 @@ Channel.prototype.onChanges = function( data ) {
 	// emit ready after all server changes have been applied
 	this.emit( 'ready' );
 }
-;
+
+Channel.prototype.onChangeVersion = function( data ) {
+	if ( data === '?' ) {
+		// time to redownload the ghost storage and reindex
+		this.startIndexing()
+	}
+}
 
 Channel.prototype.onVersion = function( data ) {
 	var ghost = parseVersionMessage( data );

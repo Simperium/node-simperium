@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events'
 import util from 'util'
-import simperiumUtil from '../../src/simperium/util'
+import simperiumUtil from 'simperium/util'
 
 var MockChannel = module.exports = function() {
 	this.acknowledger = ( function( data ) {

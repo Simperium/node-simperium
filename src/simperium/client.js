@@ -12,11 +12,9 @@ if ( typeof window !== 'undefined' && window.WebSocket ) {
 	WebSocketClient = require( 'websocket' ).w3cwebsocket;
 }
 
-module.exports = Client;
-module.exports.Bucket = Bucket;
-module.exports.Channel = Channel;
+export { Bucket, Channel }
 
-function Client( appId, accessToken, options ) {
+export default function Client( appId, accessToken, options ) {
 	options = options || {};
 
 	options.ghostStoreProvider = options.ghostStoreProvider || defaultGhostStoreProvider;
