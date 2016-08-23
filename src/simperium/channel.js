@@ -293,6 +293,7 @@ inherits( Channel, EventEmitter );
 
 Channel.prototype.handleMessage = function( data ) {
 	var message = parseMessage( data );
+	this.emit( 'receive', data )
 
 	this.message.emit( message.command, message.data );
 };

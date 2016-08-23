@@ -1,11 +1,13 @@
 import Channel from 'simperium/server/channel'
 import * as client from 'simperium'
 import defaultGhostStoreProvider from 'simperium/ghost/default'
-import assert from 'assert'
+import assert, { deepEqual } from 'assert'
 import mockBucketStore from '../mock_bucket_store'
 import * as fn from '../fn'
 import MockBucket from './mock-bucket'
 import * as change from 'simperium/util/change'
+
+const debug = require( 'debug' )( 'simperium:server:test' )
 
 const successAuthorizer = ( email, bucket ) => {
 	return ( token, cb ) => {
@@ -13,15 +15,35 @@ const successAuthorizer = ( email, bucket ) => {
 	}
 }
 
+const assertSequence = ( ... sequence ) => {
+	const done = sequence.pop()
+	if ( typeof done !== 'function' ) {
+		sequence.push( done )
+	}
+	if ( sequence.length === 0 ) {
+		throw new Error( 'no arguments given to test' )
+	}
+	return ( ... args ) => {
+		if ( sequence.length === 0 ) {
+			throw new Error( `untested sequence ${ JSON.stringify( args ) }` )
+		}
+		let head = sequence.shift()
+		deepEqual( args, head )
+		if ( done && sequence.length === 0 ) {
+			done()
+		}
+	}
+}
+
+const tick = fun => ( ... args ) => process.nextTick( () => fun( ... args ) )
+
 describe( 'Server Channel', function() {
-	var channel;
+	let channel;
 
-	beforeEach( function() {
-		channel = new Channel();
-	} )
+	beforeEach( () => channel = new Channel() )
 
-	it( 'should authorize a bucket', function( done ) {
-		var authorized = false;
+	it( 'should authorize a bucket', done => {
+		let authorized = false;
 		channel.authorizer = successAuthorizer( 'user@example.com', mockBucket() )
 
 		channel.on( 'authorized', ( user ) => {
@@ -39,21 +61,26 @@ describe( 'Server Channel', function() {
 	} )
 
 	describe( 'after authorized', function() {
-		var connection, authorize, log, bucket;
+		let connection, authorize, bucket;
 
 		beforeEach( () => {
-			log = false;
 			connection = buildClientChannel();
 			bucket = mockBucket()
 			channel.authorizer = successAuthorizer( 'user@example.com', bucket )
 
 			channel.on( 'send', ( msg ) => {
-				if ( log ) console.log( 'client', '<=', msg );
+				debug( 'server', '=>', msg );
 				connection.handleMessage( msg );
 			} )
 
+			channel.on( 'receive', ( msg ) => {
+				debug( 'server', '<=', msg )
+			} )
+
+			connection.on( 'receive', msg => debug( 'client', '<=', msg ) )
+
 			connection.on( 'send', ( msg ) => {
-				if ( log ) console.log( 'server', '<=', msg );
+				debug( 'client', '=>', msg );
 				channel.receiveMessage( msg )
 			} )
 		} )
@@ -81,12 +108,7 @@ describe( 'Server Channel', function() {
 		it( 'should respond to unknown cv request with ?', ( done ) => {
 			// populate the client's bucket with a cv
 			connection.store.cv = 'notearealcv'
-			channel.on( 'authorized', () => {
-				channel.on( 'send', fn.counts( 1, ( msg ) => {
-					assert.equal( msg, 'cv:?' )
-					done()
-				} ) )
-			} )
+			connection.on( 'receive', assertSequence( ['auth:user@example.com'], ['cv:?'], done )  )
 			authorize()
 		} )
 
@@ -113,14 +135,9 @@ describe( 'Server Channel', function() {
 			connection.store.cv = 'actualcv'
 			channel.authorizer = successAuthorizer( 'user@example.com', mockBucket( 'currentcv', [], changes.concat( { cv: 'actualcv' } ) ) )
 
-			channel.on( 'authorized', () => {
-				channel.on( 'send', fn.counts( 1, ( msg ) => {
-					setImmediate( () => {
-						assert.equal( msg, 'c:' + JSON.stringify( changes.reverse() ) )
-						done()
-					} )
-				} ) )
-			} )
+			channel.on( 'receive', ( ... args ) => debug( 'receive', ... args ) )
+			connection.on( 'receive', assertSequence( ['auth:user@example.com'], ['c:' + JSON.stringify( changes.reverse() )], done ) )
+
 			authorize()
 		} )
 

@@ -6,7 +6,8 @@ export default function Channel() {
 	EventEmitter.call( this );
 	const commands = new EventEmitter();
 
-	this.receive = this.receiveMessage = function( msg ) {
+	this.receive = this.receiveMessage = msg => {
+		this.emit( 'receive', msg )
 		const { command, data } = parseMessage( msg );
 		commands.emit( command, data );
 	}
