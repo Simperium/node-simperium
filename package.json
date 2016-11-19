@@ -1,26 +1,64 @@
 {
   "name": "simperium",
-  "version": "0.2.4",
-  "description": "A simperium client for node.js",
-  "main": "./lib/simperium/index.js",
+  "version": "2.0.0-1",
+  "description": "Simperium client",
+  "main": "lib/index.js",
+  "scripts": {
+    "flow": "`npm bin`/flow",
+    "lint": "`npm bin`/eslint .",
+    "test": "`npm bin`/flow && `npm bin`/mocha --compilers js:babel-register --recursive test/",
+    "prepackage": "`npm bin`/babel src/ -d lib/"
+  },
   "repository": {
     "type": "git",
-    "url": "git://github.com/Simperium/node-simperium.git"
-  },
-  "scripts": {
-    "test": "mocha --compilers js:babel-core/register test/**",
-    "prepublish": "babel -q -d lib/ src/"
+    "url": "git+https://github.com/simperium/node-simperium.git"
   },
   "author": "",
-  "license": "BSD-2-Clause",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/simperium/node-simperium/issues"
+  },
+  "homepage": "https://github.com/simperium/node-simperium#readme",
   "dependencies": {
-    "node-uuid": "^1.4.7",
-    "websocket": "^1.0.22"
+    "ramda": "^0.22.1",
+    "redux": "^3.6.0"
   },
   "devDependencies": {
-    "babel-cli": "^6.2.0",
-    "babel-core": "^6.2.0",
-    "babel-preset-es2015": "^6.2.0",
-    "mocha": "^2.3.4"
+    "babel-cli": "^6.18.0",
+    "babel-core": "^6.18.2",
+    "babel-eslint": "^7.1.1",
+    "babel-plugin-syntax-flow": "^6.18.0",
+    "babel-plugin-transform-flow-strip-types": "^6.18.0",
+    "babel-preset-latest": "^6.16.0",
+    "babel-register": "^6.18.0",
+    "eslint": "^3.10.2",
+    "eslint-config-wpcalypso": "^0.6.0",
+    "eslint-plugin-flowtype": "^2.25.0",
+    "eslint-plugin-wpcalypso": "^3.0.2",
+    "flow-bin": "^0.35.0",
+    "mocha": "^3.1.2",
+    "simperium-jsondiff": "^1.0.1-0"
+  },
+  "babel": {
+    "presets": [
+      "latest"
+    ],
+    "plugins": [
+      "transform-flow-strip-types",
+      "syntax-flow"
+    ]
+  },
+  "eslintConfig": {
+    "env": {
+      "mocha": true,
+      "node": true
+    },
+    "extends": [
+      "wpcalypso",
+      "plugin:flowtype/recommended"
+    ],
+    "plugins": [
+      "flowtype"
+    ]
   }
 }

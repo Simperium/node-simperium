@@ -1,0 +1,5 @@
+// @flow
+export const BUCKET_OBJECT_SAVE = 'BUCKET_OBJECT_SAVE';
+export const BUCKET_OBJECT_REMOVE = 'BUCKET_OBJECT_REMOVE';
+export const GHOST_SAVE = 'GHOST_SAVE';
+export const GHOST_REMOVE = 'GHOST_REMOVE';
