@@ -385,6 +385,16 @@ describe( 'Channel', function() {
 		} );
 	} );
 
+	it( 'should request index when cv is unknown', done => {
+		channel.once( 'send', ( data ) => {
+			ok( !store.cv )
+			ok( bucket.isIndexing )
+			equal( data, 'i:1:::10' );
+			done()
+		} )
+		channel.handleMessage( 'cv:?' );
+	} )
+
 	// TODO: handle auth failures
 	// <=	 0:auth:expired
 	// =>	 0:i:1:::10
@@ -433,14 +443,6 @@ describe( 'Channel', function() {
 				channel.handleMessage( 'auth:user@example.com' );
 			} );
 		} );
-
-		it( 'should request index when cv is unknown', done => {
-			channel.once( 'send', ( data ) => {
-				equal( data, '' );
-				done()
-			} )
-			channel.handleMessage( 'cv:?' );
-		} )
 
 		it( 'should emit index and ready event when index complete', () => new Promise( resolve => {
 			var page = 'i:{"index":[{"id":"objectid","v":1,"d":{"title":"Hello World"}}],"current":"cv"}';

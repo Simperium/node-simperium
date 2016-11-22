@@ -336,9 +336,7 @@ Channel.prototype.onAuth = function( data ) {
 				this.localQueue.start();
 				this.sendChangeVersionRequest( cv );
 			} else {
-				this.bucket.isIndexing = true;
-				this.bucket.emit( 'indexing' );
-				this.sendIndexRequest();
+				this.startIndexing();
 			}
 		};
 
@@ -347,6 +345,13 @@ Channel.prototype.onAuth = function( data ) {
 		return;
 	}
 };
+
+Channel.prototype.startIndexing = function() {
+	this.localQueue.pause();
+	this.bucket.isIndexing = true;
+	this.bucket.emit( 'indexing' );
+	this.sendIndexRequest();
+}
 
 Channel.prototype.onConnect = function() {
 	var init = {
@@ -410,9 +415,8 @@ Channel.prototype.onChanges = function( data ) {
 
 Channel.prototype.onChangeVersion = function( data ) {
 	if ( data === UNKNOWN_CV ) {
-		// TODO: delete current cv
-		// Start new index
-		throw new Error( 'not implemented' );
+		this.store.setChangeVersion( null )
+		.then( () => this.startIndexing() )
 	}
 }
 
@@ -492,6 +496,10 @@ LocalQueue.prototype.start = function() {
 	for ( queueId in this.queues ) {
 		this.processQueue( queueId );
 	}
+}
+
+LocalQueue.prototype.pause = function() {
+	this.ready = false;
 }
 
 LocalQueue.prototype.acknowledge = function( change ) {
