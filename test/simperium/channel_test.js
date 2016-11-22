@@ -434,6 +434,14 @@ describe( 'Channel', function() {
 			} );
 		} );
 
+		it( 'should request index when cv is unknown', done => {
+			channel.once( 'send', ( data ) => {
+				equal( data, '' );
+				done()
+			} )
+			channel.handleMessage( 'cv:?' );
+		} )
+
 		it( 'should emit index and ready event when index complete', () => new Promise( resolve => {
 			var page = 'i:{"index":[{"id":"objectid","v":1,"d":{"title":"Hello World"}}],"current":"cv"}';
 			let indexed = false

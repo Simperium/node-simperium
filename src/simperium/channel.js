@@ -7,6 +7,8 @@ import uuid from 'node-uuid'
 
 const jsondiff = new JSONDiff( {list_diff: false} )
 
+const UNKNOWN_CV = '?'
+
 var operation = {
 	MODIFY: 'M',
 	REMOVE: '-'
@@ -218,6 +220,7 @@ export default function Channel( appid, access_token, bucket, store ) {
 	message.on( 'i', this.onIndex.bind( this ) );
 	message.on( 'c', this.onChanges.bind( this ) );
 	message.on( 'e', this.onVersion.bind( this ) );
+	message.on( 'cv', this.onChangeVersion.bind( this ) );
 	message.on( 'o', function() {} );
 
 	this.networkQueue = new NetworkQueue();
@@ -403,8 +406,15 @@ Channel.prototype.onChanges = function( data ) {
 	} );
 	// emit ready after all server changes have been applied
 	this.emit( 'ready' );
+};
+
+Channel.prototype.onChangeVersion = function( data ) {
+	if ( data === UNKNOWN_CV ) {
+		// TODO: delete current cv
+		// Start new index
+		throw new Error( 'not implemented' );
+	}
 }
-;
 
 Channel.prototype.onVersion = function( data ) {
 	var ghost = parseVersionMessage( data );
