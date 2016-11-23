@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events'
 import { inherits } from 'util'
-import uuid from 'node-uuid';
+import uuid from 'uuid';
 
 export default function Bucket( name, storeProvider ) {
 	EventEmitter.call( this );

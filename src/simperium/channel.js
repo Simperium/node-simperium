@@ -3,7 +3,7 @@ import { format, inherits } from 'util'
 import { EventEmitter } from 'events'
 import { parseMessage, parseVersionMessage, change as change_util } from './util'
 import JSONDiff from './jsondiff'
-import uuid from 'node-uuid'
+import uuid from 'uuid'
 
 const jsondiff = new JSONDiff( {list_diff: false} )
 

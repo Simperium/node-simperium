@@ -6,7 +6,7 @@ import assert, { equal, ok } from 'assert'
 import * as fn from './fn'
 import jsondiff from '../../src/simperium/jsondiff'
 import defaultGhostStoreProvider from '../../src/simperium/ghost/default'
-import uuid from 'node-uuid'
+import uuid from 'uuid'
 import Bucket from '../../src/simperium/bucket'
 import mockBucketStore from './mock_bucket_store'
 
