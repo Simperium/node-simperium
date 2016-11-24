@@ -5,14 +5,14 @@ import { parseMessage, parseVersionMessage, change as change_util } from './util
 import JSONDiff from './jsondiff';
 import uuid from 'node-uuid';
 
-const jsondiff = new JSONDiff( {list_diff: false} );
+const jsondiff = new JSONDiff( { list_diff: false } );
 
-var operation = {
+const operation = {
 	MODIFY: 'M',
 	REMOVE: '-'
 };
 
-var internal = {};
+const internal = {};
 
 internal.updateChangeVersion = function( cv ) {
 	return this.store.setChangeVersion( cv );
@@ -22,7 +22,7 @@ internal.updateChangeVersion = function( cv ) {
 // to the ghost object and notify.
 internal.changeObject = function( id, change ) {
 	// pull out the object from the store and apply the change delta
-	var applyChange = internal.performChange.bind( this, change );
+	const applyChange = internal.performChange.bind( this, change );
 
 	this.networkQueue.queueFor( id ).add( function( done ) {
 		return applyChange().then( done, done );
@@ -30,7 +30,7 @@ internal.changeObject = function( id, change ) {
 };
 
 internal.buildModifyChange = function( id, object, ghost ) {
-	var payload = change_util.buildChange( change_util.type.MODIFY, id, object, ghost ),
+	let payload = change_util.buildChange( change_util.type.MODIFY, id, object, ghost ),
 		empty = true,
 		key;
 
@@ -41,14 +41,14 @@ internal.buildModifyChange = function( id, object, ghost ) {
 		}
 	}
 
-	if ( empty ) return this.emit( 'unmodified', id, object, ghost );
+	if ( empty ) {return this.emit( 'unmodified', id, object, ghost );}
 
 	// if the change v is an empty object, do not send, notify?
 	this.localQueue.queue( payload );
 };
 
 internal.buildRemoveChange = function( id, object, ghost ) {
-	var payload = change_util.buildChange( change_util.type.REMOVE, id, object, ghost );
+	const payload = change_util.buildChange( change_util.type.REMOVE, id, object, ghost );
 	this.localQueue.queue( payload );
 };
 
@@ -57,12 +57,12 @@ internal.sendChange = function( data ) {
 };
 
 internal.diffAndSend = function( id, object ) {
-	var modify = internal.buildModifyChange.bind( this, id, object );
+	const modify = internal.buildModifyChange.bind( this, id, object );
 	return this.store.get( id ).then( modify );
 };
 
 internal.removeAndSend = function( id, object ) {
-	var remove = internal.buildRemoveChange.bind( this, id, object );
+	const remove = internal.buildRemoveChange.bind( this, id, object );
 	return this.store.get( id ).then( remove );
 };
 
@@ -80,7 +80,7 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 	// If it's not an ack, it's a change initiated on a different client
 	// we need to provide a way for the current client to respond to
 	// a potential conflict if it has modifications that have not been synced
-	if ( !acknowledged ) {
+	if ( ! acknowledged ) {
 		changes = this.localQueue.dequeueChangesFor( id );
 		localModifications = change_util.compressChanges( changes, original );
 		remoteModifications = patch;
@@ -105,8 +105,8 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 };
 
 internal.removeObject = function( id, acknowledged ) {
-	var notify;
-	if ( !acknowledged ) {
+	let notify;
+	if ( ! acknowledged ) {
 		notify = this.emit.bind( this, 'remove', id );
 	} else {
 		notify = internal.updateAcknowledged.bind( this, acknowledged );
@@ -116,20 +116,20 @@ internal.removeObject = function( id, acknowledged ) {
 };
 
 internal.updateAcknowledged = function( change ) {
-	var id = change.id;
-	if ( this.localQueue.sent[id] === change ) {
+	const id = change.id;
+	if ( this.localQueue.sent[ id ] === change ) {
 		this.localQueue.acknowledge( change );
 		this.emit( 'acknowledge', id, change );
 	}
 };
 
 internal.performChange = function( change ) {
-	var success = internal.applyChange.bind( this, change );
+	const success = internal.applyChange.bind( this, change );
 	return this.store.get( change.id ).then( success );
 };
 
 internal.findAcknowledgedChange = function( change ) {
-	var possibleChange = this.localQueue.sent[change.id];
+	const possibleChange = this.localQueue.sent[ change.id ];
 	if ( possibleChange ) {
 		if ( ( change.ccids || [] ).indexOf( possibleChange.ccid ) > -1 ) {
 			return possibleChange;
@@ -138,7 +138,7 @@ internal.findAcknowledgedChange = function( change ) {
 };
 
 internal.applyChange = function( change, ghost ) {
-	var acknowledged = internal.findAcknowledgedChange.bind( this )( change ),
+	let acknowledged = internal.findAcknowledgedChange.bind( this )( change ),
 		error,
 		emit,
 		original,
@@ -152,7 +152,7 @@ internal.applyChange = function( change, ghost ) {
 	//	 clientid: 'node-b9776e96-c068-42ae-893a-03f50833bddb',
 	//	 error: 400 }
 	if ( change.error ) {
-		error = new Error( `${change.error} - Could not apply change to: ${ghost.key}` );
+		error = new Error( `${ change.error } - Could not apply change to: ${ ghost.key }` );
 		error.code = change.error;
 		error.change = change;
 		error.ghost = ghost;
@@ -201,9 +201,9 @@ internal.indexingComplete = function() {
 };
 
 export default function Channel( appid, access_token, bucket, store ) {
-	var channel = this;
-	var message = this.message = new EventEmitter();
-	var bucketEvents = new EventEmitter(),
+	const channel = this;
+	const message = this.message = new EventEmitter();
+	let bucketEvents = new EventEmitter(),
 		update = bucket.update,
 		remove = bucket.remove;
 
@@ -242,21 +242,21 @@ export default function Channel( appid, access_token, bucket, store ) {
 			options = { sync: true };
 		}
 
-		if ( !!options === false ) {
+		if ( !! options === false ) {
 			options = { sync: true };
 		}
 
 		return update.call( bucket, id, object, options, function( err, object ) {
-			if ( !err ) bucket.emit( 'update', id, object.data );
-			if ( !err && options.sync !== false ) bucketEvents.emit( 'update', id, object.data );
-			if ( callback ) callback.apply( this, arguments );
+			if ( ! err ) {bucket.emit( 'update', id, object.data );}
+			if ( ! err && options.sync !== false ) {bucketEvents.emit( 'update', id, object.data );}
+			if ( callback ) {callback.apply( this, arguments );}
 		} );
 	};
 
 	bucket.remove = function( id, callback ) {
 		return remove.call( bucket, id, function( err ) {
-			if ( !err ) bucketEvents.emit( 'remove', id );
-			if ( callback ) callback.apply( this, arguments );
+			if ( ! err ) {bucketEvents.emit( 'remove', id );}
+			if ( callback ) {callback.apply( this, arguments );}
 		} );
 	};
 
@@ -271,9 +271,9 @@ export default function Channel( appid, access_token, bucket, store ) {
 	// when the network sends in an update or remove, update the bucket data
 	this
 		.on( 'update', function( id, data ) {
-			var args = [].slice.call( arguments );
-			update.call( bucket, id, data, {sync: false}, function() {
-				bucket.emit.apply( bucket, ['update'].concat( args ) );
+			const args = [].slice.call( arguments );
+			update.call( bucket, id, data, { sync: false }, function() {
+				bucket.emit.apply( bucket, [ 'update' ].concat( args ) );
 			} );
 		} )
 		.on( 'remove', function( id ) {
@@ -292,7 +292,7 @@ export default function Channel( appid, access_token, bucket, store ) {
 inherits( Channel, EventEmitter );
 
 Channel.prototype.handleMessage = function( data ) {
-	var message = parseMessage( data );
+	const message = parseMessage( data );
 
 	this.message.emit( message.command, message.data );
 };
@@ -302,7 +302,7 @@ Channel.prototype.send = function( data ) {
 };
 
 Channel.prototype.onReload = function() {
-	var emit = this.emit.bind( this, 'update' );
+	const emit = this.emit.bind( this, 'update' );
 	this.store.eachGhost( function( ghost ) {
 		emit( ghost.key, ghost.data );
 	} );
@@ -317,8 +317,8 @@ Channel.prototype.onBucketUpdate = function( noteId ) {
 };
 
 Channel.prototype.onAuth = function( data ) {
-	var auth;
-	var init;
+	let auth;
+	let init;
 	try {
 		auth = JSON.parse( data );
 		this.emit( 'unauthorized', auth );
@@ -346,7 +346,7 @@ Channel.prototype.onAuth = function( data ) {
 };
 
 Channel.prototype.onConnect = function() {
-	var init = {
+	const init = {
 		name: this.bucket.name,
 		clientid: this.session_id,
 		api: '1.1',
@@ -360,23 +360,23 @@ Channel.prototype.onConnect = function() {
 };
 
 Channel.prototype.onIndex = function( data ) {
-	var page = JSON.parse( data ),
+	let page = JSON.parse( data ),
 		objects = page.index,
 		mark		= page.mark,
 		cv			= page.current,
 		update	= internal.updateObjectVersion.bind( this );
 
-	var objectId;
+	let objectId;
 	objects.forEach( function( object ) {
 		objectId = object.id;
 		update( object.id, object.v, object.d );
 	} );
 
-	if ( !mark ) {
+	if ( ! mark ) {
 		if ( objectId ) {
 			this.index_last_id = objectId;
 		}
-		if ( !this.index_last_id ) {
+		if ( ! this.index_last_id ) {
 			internal.indexingComplete.call( this );
 		}
 		this.index_cv = cv;
@@ -395,7 +395,7 @@ Channel.prototype.sendChangeVersionRequest = function( cv ) {
 };
 
 Channel.prototype.onChanges = function( data ) {
-	var changes = JSON.parse( data ),
+	let changes = JSON.parse( data ),
 		onChange = internal.changeObject.bind( this );
 
 	changes.forEach( function( change ) {
@@ -407,7 +407,7 @@ Channel.prototype.onChanges = function( data ) {
 ;
 
 Channel.prototype.onVersion = function( data ) {
-	var ghost = parseVersionMessage( data );
+	const ghost = parseVersionMessage( data );
 
 	this.emit( 'version', ghost.id, ghost.version, ghost.data );
 	this.emit( 'version.' + ghost.id, ghost.id, ghost.version, ghost.data );
@@ -418,15 +418,15 @@ function NetworkQueue() {
 }
 
 NetworkQueue.prototype.queueFor = function( id ) {
-	var queues = this.queues,
-		queue = queues[id];
+	let queues = this.queues,
+		queue = queues[ id ];
 
-	if ( !queue ) {
+	if ( ! queue ) {
 		queue = new Queue();
 		queue.on( 'finish', function() {
-			delete queues[id];
+			delete queues[ id ];
 		} );
-		queues[id] = queue;
+		queues[ id ] = queue;
 	}
 
 	return queue;
@@ -447,14 +447,14 @@ Queue.prototype.add = function( fn ) {
 };
 
 Queue.prototype.start = function() {
-	if ( this.running ) return;
+	if ( this.running ) {return;}
 	this.running = true;
 	this.emit( 'start' );
 	setImmediate( this.run.bind( this ) );
 };
 
 Queue.prototype.run = function() {
-	var fn;
+	let fn;
 	this.running = true;
 
 	if ( this.queue.length === 0 ) {
@@ -477,7 +477,7 @@ function LocalQueue( store ) {
 inherits( LocalQueue, EventEmitter );
 
 LocalQueue.prototype.start = function() {
-	var queueId;
+	let queueId;
 	this.ready = true;
 	for ( queueId in this.queues ) {
 		this.processQueue( queueId );
@@ -485,41 +485,41 @@ LocalQueue.prototype.start = function() {
 };
 
 LocalQueue.prototype.acknowledge = function( change ) {
-	if ( this.sent[change.id] === change ) {
-		delete this.sent[change.id];
+	if ( this.sent[ change.id ] === change ) {
+		delete this.sent[ change.id ];
 	}
 
 	this.processQueue( change.id );
 };
 
 LocalQueue.prototype.queue = function( change ) {
-	var queue = this.queues[change.id];
+	let queue = this.queues[ change.id ];
 
-	if ( !queue ) {
+	if ( ! queue ) {
 		queue = [];
-		this.queues[change.id] = queue;
+		this.queues[ change.id ] = queue;
 	}
 
 	queue.push( change );
 
 	this.emit( 'queued', change.id, change, queue );
 
-	if ( !this.ready ) return;
+	if ( ! this.ready ) {return;}
 
 	this.processQueue( change.id );
 }
 ;
 
 LocalQueue.prototype.dequeueChangesFor = function( id ) {
-	var changes = [], sent = this.sent[id], queue = this.queues[id];
+	let changes = [], sent = this.sent[ id ], queue = this.queues[ id ];
 
 	if ( sent ) {
-		delete this.sent[id];
+		delete this.sent[ id ];
 		changes.push( sent );
 	}
 
 	if ( queue ) {
-		delete this.queues[id];
+		delete this.queues[ id ];
 		changes = changes.concat( queue );
 	}
 
@@ -527,20 +527,20 @@ LocalQueue.prototype.dequeueChangesFor = function( id ) {
 };
 
 LocalQueue.prototype.processQueue = function( id ) {
-	var queue = this.queues[id];
-	var compressAndSend = this.compressAndSend.bind( this, id );
+	const queue = this.queues[ id ];
+	const compressAndSend = this.compressAndSend.bind( this, id );
 
 	// there is no queue, don't do anything
-	if ( !queue ) return;
+	if ( ! queue ) {return;}
 
 	// queue is empty, delete it from memory
 	if ( queue.length === 0 ) {
-		delete this.queues[id];
+		delete this.queues[ id ];
 		return;
 	}
 
 	// waiting for a previous sent change to get acknowledged
-	if ( this.sent[id] ) {
+	if ( this.sent[ id ] ) {
 		this.emit( 'wait', id );
 		return;
 	}
@@ -549,29 +549,29 @@ LocalQueue.prototype.processQueue = function( id ) {
 };
 
 LocalQueue.prototype.compressAndSend = function( id, ghost ) {
-	var changes = this.queues[id];
-	var change;
-	var target = ghost.data;
-	var c;
-	var type;
+	const changes = this.queues[ id ];
+	let change;
+	let target = ghost.data;
+	let c;
+	let type;
 
 	// a change was sent before we could compress and send
-	if ( this.sent[id] ) {
+	if ( this.sent[ id ] ) {
 		this.emit( 'wait', id );
 		return;
 	}
 
 	if ( changes.length === 1 ) {
 		change = changes.shift();
-		this.sent[id] = change;
+		this.sent[ id ] = change;
 		this.emit( 'send', change );
 		return;
 	}
 
-	if ( changes.length > 1 && changes[0].type === change_util.type.REMOVE ) {
+	if ( changes.length > 1 && changes[ 0 ].type === change_util.type.REMOVE ) {
 		change = changes.shift();
 		changes.splice( 0, changes.length - 1 );
-		this.sent[id] = change;
+		this.sent[ id ] = change;
 		this.emit( 'send', change );
 	}
 
@@ -589,21 +589,21 @@ LocalQueue.prototype.compressAndSend = function( id, ghost ) {
 	type = target === null ? change_util.type.REMOVE : change_util.type.MODIFY;
 	change = change_util.buildChange( type, id, target, ghost );
 
-	this.sent[id] = change;
+	this.sent[ id ] = change;
 	this.emit( 'send', change );
 };
 
 LocalQueue.prototype.resendSentChanges = function() {
-	for ( let ccid in this.sent ) {
-		this.emit( 'send', this.sent[ccid] );
+	for ( const ccid in this.sent ) {
+		this.emit( 'send', this.sent[ ccid ] );
 	}
 };
 
 function collectionRevisions( channel, id, callback ) {
-	var expectedVersions = -1;
-	var onGhostRetrieved = function( ghost ) {
-		var version = Math.min( ghost.version, 30 );
-		var i;
+	let expectedVersions = -1;
+	const onGhostRetrieved = function( ghost ) {
+		const version = Math.min( ghost.version, 30 );
+		let i;
 		expectedVersions = version;
 
 		// Loop through requested revision count and request each version
@@ -612,9 +612,9 @@ function collectionRevisions( channel, id, callback ) {
 		}
 	};
 
-	var versions = [];
-	var onVersion = function( id, version, data ) {
-		versions.push( {id: id, version: version, data: data} );
+	const versions = [];
+	const onVersion = function( id, version, data ) {
+		versions.push( { id: id, version: version, data: data } );
 
 		// Check if all versions have been collected
 		if ( expectedVersions === versions.length ) {

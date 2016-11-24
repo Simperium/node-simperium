@@ -2,15 +2,15 @@ import { EventEmitter } from 'events';
 import util from 'util';
 import simperiumUtil from '../../src/simperium/util';
 
-var MockChannel = module.exports = function() {
+const MockChannel = module.exports = function() {
 	this.acknowledger = ( function( data ) {
-		var change = JSON.parse( data ),
+		let change = JSON.parse( data ),
 			ack = {
 				id: change.id,
 				o: change.o,
 				v: change.v,
 				ev: change.sv ? change.sv + 1 : 0,
-				ccids: [change.ccid]
+				ccids: [ change.ccid ]
 			};
 
 		if ( change.sv ) {
@@ -25,7 +25,7 @@ var MockChannel = module.exports = function() {
 util.inherits( MockChannel, EventEmitter );
 
 MockChannel.prototype.send = function( data ) {
-	var message = simperiumUtil.parseMessage( data );
+	const message = simperiumUtil.parseMessage( data );
 	this.emit( 'send', data );
 	this.emit( util.format( 'command.%s', message.command ), message.data );
 };

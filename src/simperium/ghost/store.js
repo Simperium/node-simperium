@@ -23,7 +23,7 @@ Store.prototype.setChangeVersion = function( cv ) {
 Store.prototype.put = function( id, version, data ) {
 	return new Promise( ( resolve ) => {
 		setImmediate( () => {
-			this.index[id] = JSON.stringify( {version: version, data: data} );
+			this.index[ id ] = JSON.stringify( { version: version, data: data } );
 			resolve( true );
 		} );
 	} );
@@ -32,11 +32,11 @@ Store.prototype.put = function( id, version, data ) {
 Store.prototype.get = function( id ) {
 	return new Promise( ( resolve ) => {
 		setImmediate( () => {
-			var ghost = this.index[id];
-			if ( !ghost ) {
-				ghost = {data: {}};
+			let ghost = this.index[ id ];
+			if ( ! ghost ) {
+				ghost = { data: {} };
 				ghost.key = id;
-				this.index[id] = JSON.stringify( ghost );
+				this.index[ id ] = JSON.stringify( ghost );
 			} else {
 				ghost = JSON.parse( ghost );
 			}
@@ -48,7 +48,7 @@ Store.prototype.get = function( id ) {
 Store.prototype.remove = function( id ) {
 	return new Promise( ( resolve ) => {
 		setImmediate( () => {
-			delete this.index[id];
+			delete this.index[ id ];
 			resolve();
 		} );
 	} );

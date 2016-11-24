@@ -4,11 +4,11 @@ import { inherits, format } from 'util';
 import { EventEmitter } from 'events';
 import { parseMessage } from './util';
 
-var datasource = new DataSource();
+const datasource = new DataSource();
 
 export default function() {
 	const server = http.createServer( function( req, res ) {
-		console.log( 'Received request for', + req.url );
+		console.log( 'Received request for', +req.url );
 		res.writeHead( 404 );
 		res.end();
 	} );
@@ -28,7 +28,7 @@ export default function() {
 	} );
 
 	return server;
-};
+}
 
 function Session( connection ) {
 	this.connection = connection.on( 'message', this.onMessage.bind( this ) );
@@ -38,14 +38,14 @@ function Session( connection ) {
 inherits( Session, EventEmitter );
 
 Session.prototype.onMessage = function( msg ) {
-	var message = parseMessage( msg.utf8Data ),
+	let message = parseMessage( msg.utf8Data ),
 		channelId = message.command,
 		channel,
 		i;
 
 	if ( channelId === 'h' ) {
 		i = parseInt( message.data );
-		if ( isNaN( i ) ) i = 0;
+		if ( isNaN( i ) ) {i = 0;}
 		this.connection.send( format( 'h:%d', i + 1 ) );
 		return;
 	}
@@ -57,19 +57,19 @@ Session.prototype.onMessage = function( msg ) {
 };
 
 Session.prototype.getChannel = function( id ) {
-	var channel = this.channels[id],
+	let channel = this.channels[ id ],
 		connection;
 
-	if ( !channel ) {
+	if ( ! channel ) {
 		connection = this.connection;
 		channel = new Channel( id );
-		this.channels[id] = channel;
+		this.channels[ id ] = channel;
 		channel
 		.on( 'send', function( data ) {
 			connection.send( format( '%d:%s', id, data ) );
 		} )
 		.on( 'unauthorized', function() {
-			connection.send( format( '%d:auth:%s', id, JSON.stringify( {code: 500} ) ) );
+			connection.send( format( '%d:auth:%s', id, JSON.stringify( { code: 500 } ) ) );
 			connection.close();
 		} );
 	}
@@ -91,12 +91,12 @@ function Channel( id, settings ) {
 inherits( Channel, EventEmitter );
 
 Channel.prototype.handleMessage = function( data ) {
-	var message = parseMessage( data );
+	const message = parseMessage( data );
 	this.messages.emit( message.command, message.data );
 };
 
 Channel.prototype.init = function( data ) {
-	var options = JSON.parse( data ),
+	let options = JSON.parse( data ),
 		name = options.name,
 		token = options.token,
 		emit = this.emit.bind( this );
@@ -107,7 +107,7 @@ Channel.prototype.init = function( data ) {
 	this.bucket = this.settings.bucketAdapter();
 
 	this.bucket.initialize( options, function( e, user ) {
-		if ( e ) return emit( 'unauthorized', e );
+		if ( e ) {return emit( 'unauthorized', e );}
 		emit( 'send', format( 'auth:%s', user.email ) );
 	} );
 };
@@ -136,7 +136,7 @@ function DataSource() {
 }
 
 DataSource.prototype.authorize = function( token, callback ) {
-	var user = this.tokens[token];
+	const user = this.tokens[ token ];
 	if ( user ) {
 		callback( null, user );
 	} else {

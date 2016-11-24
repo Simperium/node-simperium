@@ -7,7 +7,7 @@ const changeTypes = {
 	ADD: '+'
 };
 
-const { object_diff, transform_object_diff, apply_object_diff } = jsondiff( {list_diff: false} );
+const { object_diff, transform_object_diff, apply_object_diff } = jsondiff( { list_diff: false } );
 
 export {
 	changeTypes as type,
@@ -26,16 +26,16 @@ function buildChange( type, id, object, ghost ) {
 }
 
 function buildChangeFromOrigin( type, id, version, target, origin ) {
-	var changeData = {
+	const changeData = {
 		o: type,
 		id: id,
 		ccid: uuid.v4()
 	};
 
 	// Remove operations have no source version or diff
-	if ( type === changeTypes.REMOVE ) return changeData;
+	if ( type === changeTypes.REMOVE ) {return changeData;}
 
-	if ( version > 0 ) changeData.sv = version;
+	if ( version > 0 ) {changeData.sv = version;}
 
 	changeData.v = object_diff( origin, target );
 
@@ -43,24 +43,24 @@ function buildChangeFromOrigin( type, id, version, target, origin ) {
 }
 
 function compressChanges( changes, origin ) {
-	var modified;
+	let modified;
 
 	if ( changes.length === 0 ) {
 		return {};
 	}
 
 	if ( changes.length === 1 ) {
-		return changes[0].v;
+		return changes[ 0 ].v;
 	}
 
 	modified = changes.reduce( function( from, change ) {
 		// deletes when, any changes after a delete are ignored
-		if ( from === null ) return null;
-		if ( from.o === changeTypes.REMOVE ) return null;
+		if ( from === null ) {return null;}
+		if ( from.o === changeTypes.REMOVE ) {return null;}
 		return apply_object_diff( from, change.v );
 	}, origin );
 
-	if ( modified === null ) return null;
+	if ( modified === null ) {return null;}
 
 	return object_diff( origin, modified );
 }

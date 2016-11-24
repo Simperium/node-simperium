@@ -16,7 +16,7 @@ Bucket.prototype.reload = function() {
 };
 
 Bucket.prototype.add = function( object, callback ) {
-	var id = uuid.v4();
+	const id = uuid.v4();
 	return this.update( id, object, callback );
 };
 
@@ -33,7 +33,7 @@ Bucket.prototype.update = function( id, data, options, callback ) {
 
 Bucket.prototype.touch = function( id, callback ) {
 	return this.store.get( id, ( e, object ) => {
-		if ( e ) return callback( e );
+		if ( e ) {return callback( e );}
 		this.update( object.id, object.data, callback );
 	} );
 };

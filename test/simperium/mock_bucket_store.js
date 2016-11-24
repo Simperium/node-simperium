@@ -8,22 +8,22 @@ function BucketStore() {
 }
 
 BucketStore.prototype.get = function( id, callback ) {
-	var objects = this.objects;
+	const objects = this.objects;
 
 	process.nextTick( function() {
-		callback( null, objects[id] );
+		callback( null, objects[ id ] );
 	} );
 };
 
 BucketStore.prototype.update = function( id, object, isIndexing, callback ) {
-	this.objects[id] = object;
+	this.objects[ id ] = object;
 	process.nextTick( function() {
-		if ( callback ) callback( null, {id: id, data: object, isIndexing: isIndexing} );
+		if ( callback ) {callback( null, { id: id, data: object, isIndexing: isIndexing } );}
 	} );
 };
 
 BucketStore.prototype.remove = function( id, callback ) {
-	delete this.objects[id];
+	delete this.objects[ id ];
 	process.nextTick( function() {
 		callback( null );
 	} );

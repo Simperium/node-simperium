@@ -4,7 +4,7 @@ import * as fn from './fn';
 describe( 'util.fn', function() {
 	describe( 'when', function() {
 		it( 'should execute when callback return true', function() {
-			var fire = function() {
+			let fire = function() {
 					return true;
 				},
 				shouldFire = false,
@@ -13,7 +13,7 @@ describe( 'util.fn', function() {
 				},
 				ifShouldFire = fn.when( check, fire );
 
-			assert.ok( !ifShouldFire() );
+			assert.ok( ! ifShouldFire() );
 
 			shouldFire = true;
 
@@ -23,25 +23,25 @@ describe( 'util.fn', function() {
 
 	describe( 'times', function() {
 		it( 'should execute x times and return each result', function() {
-			var add = function( a, b ) {
+			let add = function( a, b ) {
 					return a + b;
 				},
 				times = fn.times( 3, add, 1, 2 );
 
-			assert.deepEqual( times(), [3, 3, 3] );
+			assert.deepEqual( times(), [ 3, 3, 3 ] );
 		} );
 	} );
 
 	describe( 'counts', function() {
 		it( 'should only execute when fired the requested times', function() {
-			var fire = function() {
+			let fire = function() {
 					return true;
 				},
 				counts = fn.counts( 3, fire ),
 				i;
 
 			for ( i = 0; i < 3; i++ ) {
-				assert.ok( !counts() );
+				assert.ok( ! counts() );
 			}
 
 			assert.ok( counts() );
@@ -50,9 +50,9 @@ describe( 'util.fn', function() {
 
 	describe( 'debounce', function() {
 		it( 'should only fire every x times', function() {
-			var count = 0,
+			let count = 0,
 				fire = function() {
-					count ++;
+					count++;
 					return true;
 				},
 				debounced = fn.debounce( 10, fire ),

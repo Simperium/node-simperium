@@ -19,7 +19,7 @@ const stubResponse = ( data ) => stub( ( body, handler ) => {
 } );
 
 describe( 'Auth', () => {
-	var auth;
+	let auth;
 
 	beforeEach( () => {
 		auth = new Auth( 'token', 'secret' );

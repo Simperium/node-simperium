@@ -1,5 +1,5 @@
 export default function( data ) {
-	var marker = data.indexOf( ':' );
+	const marker = data.indexOf( ':' );
 
 	return {
 		command: data.slice( 0, marker ),

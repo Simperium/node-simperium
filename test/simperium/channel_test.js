@@ -19,7 +19,7 @@ const cycle = ( ... fns ) => ( ... args ) => {
 };
 
 describe( 'Channel', function() {
-	var channel, bucket, store;
+	let channel, bucket, store;
 
 	beforeEach( function() {
 		bucket = new Bucket( 'things', mockBucketStore );
@@ -29,7 +29,7 @@ describe( 'Channel', function() {
 
 	it( 'should send init on connect', function( done ) {
 		channel.on( 'send', function( data ) {
-			var message = parseMessage( data ),
+			let message = parseMessage( data ),
 				payload = JSON.parse( message.data );
 
 			assert.ok( payload.name );
@@ -46,18 +46,18 @@ describe( 'Channel', function() {
 	} );
 
 	it( 'should apply change', function( done ) {
-		var id = 'thingamajig',
+		let id = 'thingamajig',
 			version = 1,
 			data		= { content: 'Lol' },
-			changes = [{ sv: version,
+			changes = [ { sv: version,
 									o: 'M',
 									id: id,
 									clientid: 'sjs-2013070502-a1fab97d463883d66bae',
-									v: diff( data, {content: 'hola mundo'} ),
+									v: diff( data, { content: 'hola mundo' } ),
 									ev: 106,
 									cv: '5262d90aba5fdc4ed7eb2bc7',
 									ccids: [ 'ebd2c21c8a91be24c078746d9e935a3a' ]
-								}];
+								} ];
 
 		channel.once( 'update', function( id, data ) {
 			assert.equal( data.content, 'Lol' );
@@ -68,18 +68,18 @@ describe( 'Channel', function() {
 			} );
 		} );
 
-		channel.handleMessage( util.format( 'i:%s', JSON.stringify( {index: [{v: version, id: id, d: data}]} ) ) );
+		channel.handleMessage( util.format( 'i:%s', JSON.stringify( { index: [ { v: version, id: id, d: data } ] } ) ) );
 		channel.handleMessage( util.format( 'c:%s', JSON.stringify( changes ) ) );
 	} );
 
 	it( 'should queue multiple changes', function( done ) {
-		var id = 'object',
-			version1 = { content: 'step 1'},
-			version2 = { content: 'step 2'},
-			version3 = { content: 'step 3'},
-			change1 = { o: 'M', ev: 1, cv: 'cv1', id: id, v: diff( {}, version1 )},
-			change2 = { o: 'M', ev: 2, sv: 1, cv: 'cv2', id: id, v: diff( version1, version2 )},
-			change3 = { o: 'M', ev: 3, sv: 2, cv: 'cv3', id: id, v: diff( version2, version3 )},
+		let id = 'object',
+			version1 = { content: 'step 1' },
+			version2 = { content: 'step 2' },
+			version3 = { content: 'step 3' },
+			change1 = { o: 'M', ev: 1, cv: 'cv1', id: id, v: diff( {}, version1 ) },
+			change2 = { o: 'M', ev: 2, sv: 1, cv: 'cv2', id: id, v: diff( version1, version2 ) },
+			change3 = { o: 'M', ev: 3, sv: 2, cv: 'cv3', id: id, v: diff( version2, version3 ) },
 			check = fn.counts( 2, function( id, data ) {
 				assert.equal( data.content, 'step 3' );
 				done();
@@ -87,7 +87,7 @@ describe( 'Channel', function() {
 
 		channel.on( 'update', check );
 
-		channel.onChanges( JSON.stringify( [change1, change2, change3] ) );
+		channel.onChanges( JSON.stringify( [ change1, change2, change3 ] ) );
 	} );
 
 	describe( 'with index', function() {
@@ -97,7 +97,7 @@ describe( 'Channel', function() {
 
 		it( 'should send change to create object', function( done ) {
 			channel.on( 'send', function( data ) {
-				var marker = data.indexOf( ':' ),
+				let marker = data.indexOf( ':' ),
 					command = data.substring( 0, marker ),
 					payload = JSON.parse( data.substring( marker + 1 ) ),
 					patch = payload.v;
@@ -108,12 +108,12 @@ describe( 'Channel', function() {
 				done();
 			} );
 
-			bucket.update( '12345', {content: 'Hola mundo!'} );
+			bucket.update( '12345', { content: 'Hola mundo!' } );
 		} );
 
 		it( 'should not send a change with an empty diff', function( done ) {
-			var data = { title: 'hello world'};
-			channel.store.put( 'thing', 1, {title: 'hello world'} )
+			const data = { title: 'hello world' };
+			channel.store.put( 'thing', 1, { title: 'hello world' } )
 			.then( function() {
 				channel.localQueue.on( 'send', function() {
 					assert.fail( 'Channel should not send empty changes' );
@@ -126,7 +126,7 @@ describe( 'Channel', function() {
 		} );
 
 		it( 'should queue a change when pending exists', function( done ) {
-			var data = { title: 'Hola mundo!', content: 'Bienvenidos a Simperium' },
+			let data = { title: 'Hola mundo!', content: 'Bienvenidos a Simperium' },
 				data2 = { title: 'Hell world!', content: 'Welcome to Simperium' },
 				checkSent = function() {
 					throw new Error( 'Sent too many changes' );
@@ -149,10 +149,10 @@ describe( 'Channel', function() {
 		} );
 
 		it( 'should acknowledge sent change', function( done ) {
-			var data = { title: 'Auto acknowledge!' };
+			const data = { title: 'Auto acknowledge!' };
 
 			channel.on( 'acknowledge', function( id ) {
-				assert.equal( undefined, channel.localQueue.sent[id] );
+				assert.equal( undefined, channel.localQueue.sent[ id ] );
 				done();
 			} );
 
@@ -167,11 +167,11 @@ describe( 'Channel', function() {
 			let id = 'mock-id', ccid = 'mock-ccid';
 			// queue should emit a finish event when the change is processed
 			channel.networkQueue.queueFor( id ).on( 'finish', () => done() );
-			channel.handleMessage( 'c:' + JSON.stringify( [ { ccids: [ ccid ], error: 409, id }] ) );
+			channel.handleMessage( 'c:' + JSON.stringify( [ { ccids: [ ccid ], error: 409, id } ] ) );
 		} );
 
 		it( 'should resend sent but unacknowledged changes on reconnect', () => new Promise( resolve => {
-			channel.localQueue.sent['fake-ccid'] = { fake: 'change', ccid: 'fake-ccid' };
+			channel.localQueue.sent[ 'fake-ccid' ] = { fake: 'change', ccid: 'fake-ccid' };
 
 			channel.on( 'send', cycle(
 				m => setImmediate( () => {
@@ -189,7 +189,7 @@ describe( 'Channel', function() {
 
 		it( 'should send remove operation', function( done ) {
 			channel.on( 'send', function( msg ) {
-				var message = parseMessage( msg ),
+				let message = parseMessage( msg ),
 					change = JSON.parse( message.data );
 
 				assert.equal( change.o, '-' );
@@ -201,13 +201,13 @@ describe( 'Channel', function() {
 
 			channel.on( 'acknowledge', function() {
 				store.get( '123' ).then( function( ghost ) {
-					assert.ok( !ghost.version, 'store should have deleted ghost' );
+					assert.ok( ! ghost.version, 'store should have deleted ghost' );
 					assert.deepEqual( ghost.data, {} );
 					done();
 				} );
 			} );
 
-			store.put( '123', 3, {title: 'hello world'} ).then( function() {
+			store.put( '123', 3, { title: 'hello world' } ).then( function() {
 				store.get( '123' ).then( function( ghost ) {
 					assert.equal( ghost.version, 3 );
 					bucket.remove( '123' );
@@ -216,29 +216,29 @@ describe( 'Channel', function() {
 		} );
 
 		it( 'should wait for changes before removing', function( done ) {
-			var validate = fn.counts( 1, function() {
-				var queue = channel.localQueue.queues['123'];
+			const validate = fn.counts( 1, function() {
+				const queue = channel.localQueue.queues[ '123' ];
 				assert.equal( queue.length, 2 );
-				assert.equal( queue.slice( -1 )[0].o, '-' );
+				assert.equal( queue.slice( -1 )[ 0 ].o, '-' );
 				done();
 			} );
 
 			channel.localQueue.on( 'wait', validate );
 
 			channel.once( 'send', function() {
-				bucket.update( '123', {title: 'hello again world'} );
+				bucket.update( '123', { title: 'hello again world' } );
 				bucket.remove( '123' );
 			} );
 
-			store.put( '123', 3, {title: 'hello world'} ).then( function() {
-				bucket.update( '123', {title: 'goodbye world'} );
+			store.put( '123', 3, { title: 'hello world' } ).then( function() {
+				bucket.update( '123', { title: 'goodbye world' } );
 			} );
 		} );
 
 		it( 'should notify bucket after receiving a network change', function( done ) {
-			var id = 'object',
-				data = { content: 'step 1'},
-				change = { o: 'M', ev: 1, cv: 'cv1', id: id, v: diff( {}, data )};
+			let id = 'object',
+				data = { content: 'step 1' },
+				change = { o: 'M', ev: 1, cv: 'cv1', id: id, v: diff( {}, data ) };
 
 			bucket.on( 'update', function() {
 				bucket.get( 'object', function( err, object ) {
@@ -247,7 +247,7 @@ describe( 'Channel', function() {
 				} );
 			} );
 
-			channel.handleMessage( 'c:' + JSON.stringify( [change] ) );
+			channel.handleMessage( 'c:' + JSON.stringify( [ change ] ) );
 		} );
 
 		it( 'should emit ready after receiving changes', ( done ) => {
@@ -256,47 +256,47 @@ describe( 'Channel', function() {
 		} );
 
 		it( 'should notify bucket after network deletion', function( done ) {
-			var key = 'deleteTest';
+			const key = 'deleteTest';
 
 			bucket.on( 'remove', function( id ) {
 				bucket.get( id, function( e, id, object ) {
-					assert.ok( !object );
+					assert.ok( ! object );
 					done();
 				} );
 			} );
 
-			bucket.update( key, {title: 'hello world'}, function() {
-				channel.handleMessage( 'c:' + JSON.stringify( [{
+			bucket.update( key, { title: 'hello world' }, function() {
+				channel.handleMessage( 'c:' + JSON.stringify( [ {
 					o: '-', ev: 1, cv: 'cv1', id: key
-				}] ) );
+				} ] ) );
 			} );
 		} );
 
 		it( 'should request revisions', function( done ) {
-			var key = 'thing',
+			let key = 'thing',
 				version = 8,
 				assertMessage = function( msg ) {
 					var msg = parseMessage( msg ),
 						versionMsg = msg.data.split( '.' );
 
 					assert.equal( 'e', msg.command );
-					assert.equal( key, versionMsg[0] );
+					assert.equal( key, versionMsg[ 0 ] );
 				},
 				requests = [];
 
-			store.index[key] = JSON.stringify( {version: version, data: {title: 'Hello world'}} );
+			store.index[ key ] = JSON.stringify( { version: version, data: { title: 'Hello world' } } );
 
 			channel.on( 'send', function( message ) {
-				var i;
-				var msg;
-				var body;
+				let i;
+				let msg;
+				let body;
 
 				requests.push( message );
 				assertMessage( message );
 				if ( requests.length === 8 ) {
 					for ( i = 0; i < 8; i++ ) {
 						msg = 'e:' + key + '.' + ( i + 1 );
-						body = JSON.stringify( {title: 'title: ' + ( i + 1 )} );
+						body = JSON.stringify( { title: 'title: ' + ( i + 1 ) } );
 
 						channel.handleMessage( msg + '\n' + body );
 					}
@@ -304,7 +304,7 @@ describe( 'Channel', function() {
 			} );
 
 			bucket.getRevisions( key, function( err, revisions ) {
-				if ( err ) return done( err );
+				if ( err ) {return done( err );}
 				assert.equal( 8, revisions.length );
 				done();
 			} );
@@ -314,11 +314,11 @@ describe( 'Channel', function() {
 		// local changes should be rebased onto the new ghost and re-sent
 		it( 'should resolve applying patch to modified object', function( done ) {
 			// add an item to the index
-			var key = 'hello',
+			let key = 'hello',
 				current = { title: 'Hello world' },
-				remoteDiff = diff( current, { title: 'Hello kansas'} );
+				remoteDiff = diff( current, { title: 'Hello kansas' } );
 
-			store.index[key] = JSON.stringify( { version: 1, data: current } );
+			store.index[ key ] = JSON.stringify( { version: 1, data: current } );
 
 			// when the channel is updated, it should be the result of
 			// the local changes being rebased on top of changes coming from the
@@ -330,25 +330,25 @@ describe( 'Channel', function() {
 			} );
 
 			channel.on( 'send', function() {
-				assert.equal( channel.localQueue.sent[key].v.title.v, '-5\t+Goodbye\t=7' );
+				assert.equal( channel.localQueue.sent[ key ].v.title.v, '-5\t+Goodbye\t=7' );
 				done();
 			} );
 
 			// We receive a remote change from "Hello world" to "Hello kansas"
-			channel.handleMessage( 'c:' + JSON.stringify( [{
+			channel.handleMessage( 'c:' + JSON.stringify( [ {
 				o: 'M', ev: 2, sv: 1, cv: 'cv1', id: key, v: remoteDiff
-			}] ) );
+			} ] ) );
 
 			// We're changing "Hello world" to "Goodbye world"
-			bucket.update( key, {title: 'Goodbye world'} );
+			bucket.update( key, { title: 'Goodbye world' } );
 		} );
 
 		it( 'should emit errors on the bucket instance', function( done ) {
-			const error = {error: 404, id: 'thing', ccids: ['abc']};
+			const error = { error: 404, id: 'thing', ccids: [ 'abc' ] };
 			bucket.on( 'error', ( e ) => {
 				process.nextTick( () => {
 					equal( 404, e.code );
-					equal( `${ e.code } - Could not apply change to: ${error.id}`, e.message );
+					equal( `${ e.code } - Could not apply change to: ${ error.id }`, e.message );
 					done();
 				} );
 			} );
@@ -358,7 +358,7 @@ describe( 'Channel', function() {
 		it( 'should ignore 412 change errors', function( done ) {
 			// if a change is sent and acknowledged with a 412, change should be dequeued and
 			// no error should be emitted
-			var change = {o: 'M', id: 'thing', ev: 2, ccid: 'abc', v: diff( {}, {hello: 'world'} ) };
+			const change = { o: 'M', id: 'thing', ev: 2, ccid: 'abc', v: diff( {}, { hello: 'world' } ) };
 
 			// channel should not emit error during this change
 			channel.on( 'error', function( e ) {
@@ -369,7 +369,7 @@ describe( 'Channel', function() {
 			channel.store.put( 'thing', 1, {} ).then( function() {
 				// change is acknowledged and cleared from the queue
 				channel.on( 'acknowledge', function() {
-					assert( !channel.localQueue.sent.thing );
+					assert( ! channel.localQueue.sent.thing );
 					done();
 				} );
 
@@ -377,7 +377,7 @@ describe( 'Channel', function() {
 				channel.localQueue.once( 'send', function() {
 					assert( channel.localQueue.sent.thing );
 					// send a 412 response
-					channel.handleMessage( 'c:' + JSON.stringify( [{error: 412, id: 'thing', ccids: ['abc']}] ) );
+					channel.handleMessage( 'c:' + JSON.stringify( [ { error: 412, id: 'thing', ccids: [ 'abc' ] } ] ) );
 				} );
 				// queue up the change
 				channel.localQueue.queue( change );
@@ -407,7 +407,7 @@ describe( 'Channel', function() {
 
 		it( 'should request index', function( done ) {
 			channel.once( 'send', function( data ) {
-				var message = parseMessage( data );
+				const message = parseMessage( data );
 
 				assert.equal( 'i', message.command );
 				assert.equal( '1:::10', message.data );
@@ -418,11 +418,11 @@ describe( 'Channel', function() {
 		} );
 
 		it( 'should request cv', function( done ) {
-			var cv = 'abcdefg';
+			const cv = 'abcdefg';
 
 			channel.once( 'send', function( data ) {
 				setImmediate( function() {
-					var message = parseMessage( data );
+					const message = parseMessage( data );
 					assert.equal( 'cv', message.command );
 					assert.equal( cv, message.data );
 					done();
@@ -435,11 +435,11 @@ describe( 'Channel', function() {
 		} );
 
 		it( 'should emit index and ready event when index complete', () => new Promise( resolve => {
-			var page = 'i:{"index":[{"id":"objectid","v":1,"d":{"title":"Hello World"}}],"current":"cv"}';
+			const page = 'i:{"index":[{"id":"objectid","v":1,"d":{"title":"Hello World"}}],"current":"cv"}';
 			let indexed = false;
 			channel.on( 'index', function( cv ) {
 				assert.equal( 'cv', cv );
-				assert( !bucket.isIndexing );
+				assert( ! bucket.isIndexing );
 				indexed = true;
 			} );
 			channel.on( 'ready', () => {
@@ -450,7 +450,7 @@ describe( 'Channel', function() {
 		} ) );
 
 		it( 'should request next index page', function( done ) {
-			var page = 'i:{"index":[{"id":"objectid","v":1,"d":{"title":"Hello World"}}],"mark":"next-mark","current":"cv"}';
+			const page = 'i:{"index":[{"id":"objectid","v":1,"d":{"title":"Hello World"}}],"mark":"next-mark","current":"cv"}';
 			channel.once( 'send', function() {
 				channel.handleMessage( page );
 			} );
@@ -464,14 +464,14 @@ describe( 'Channel', function() {
 } );
 
 function acknowledge( channel, msg, cv ) {
-	var message = parseMessage( msg ),
+	let message = parseMessage( msg ),
 		change = JSON.parse( message.data ),
 		ack = {
 			id: change.id,
 			o: change.o,
 			v: change.v,
 			ev: change.sv ? change.sv + 1 : 0,
-			ccids: [change.ccid],
+			ccids: [ change.ccid ],
 			cv: cv || uuid.v4()
 		};
 
@@ -479,5 +479,5 @@ function acknowledge( channel, msg, cv ) {
 		ack.sv = change.sv;
 	}
 
-	channel.handleMessage( util.format( 'c:%s', JSON.stringify( [ack] ) ) );
+	channel.handleMessage( util.format( 'c:%s', JSON.stringify( [ ack ] ) ) );
 }
