@@ -1,7 +1,6 @@
 language: node_js
 sudo: false
 script:
-  - "`npm bin`/eslint --quiet ."
   - npm test
 node_js:
   - "4.0"
