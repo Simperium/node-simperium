@@ -1,11 +1,11 @@
-import { format, inherits } from 'util'
-import { EventEmitter } from 'events'
-import Bucket from './bucket'
-import Channel from './channel'
-import defaultGhostStoreProvider from './ghost/default'
-import defaultObjectStoreProvider from './storage/default'
+import { format, inherits } from 'util';
+import { EventEmitter } from 'events';
+import Bucket from './bucket';
+import Channel from './channel';
+import defaultGhostStoreProvider from './ghost/default';
+import defaultObjectStoreProvider from './storage/default';
 
-var WebSocketClient;
+let WebSocketClient;
 if ( typeof window !== 'undefined' && window.WebSocket ) {
 	WebSocketClient = window.WebSocket;
 } else {
@@ -32,7 +32,7 @@ function Client( appId, accessToken, options ) {
 	this.heartbeat.on( 'timeout', this.onConnectionTimeout.bind( this ) );
 
 	this.reconnectionTimer = new ReconnectionTimer( function( attempt ) {
-		var time = ( attempt >= 3 ? ( attempt - 3 ) * 3000 : 0 ) + 3000;
+		const time = ( attempt >= 3 ? ( attempt - 3 ) * 3000 : 0 ) + 3000;
 		return time;
 	}, this.onReconnect.bind( this ) );
 
@@ -52,7 +52,7 @@ function Client( appId, accessToken, options ) {
 inherits( Client, EventEmitter );
 
 Client.prototype.bucket = function( name ) {
-	var channelId = this.buckets.length,
+	let channelId = this.buckets.length,
 		bucket = new Bucket( name, this.options.objectStoreProvider ),
 		channel = new Channel( this.appId, this.accessToken, bucket, this.options.ghostStoreProvider( bucket ) ),
 		send = this.sendChannelMessage.bind( this, channelId ),
@@ -69,13 +69,15 @@ Client.prototype.bucket = function( name ) {
 		channel.access_token = token;
 	} );
 
-	if ( this.open ) channel.onConnect();
+	if ( this.open ) {
+		channel.onConnect();
+	}
 
 	return bucket;
 };
 
 Client.prototype.onHeartbeat = function( message ) {
-	var counter = parseInt( message );
+	const counter = parseInt( message );
 	this.heartbeat.tick( counter );
 };
 
@@ -99,7 +101,9 @@ Client.prototype.onConnectionTimeout = function() {
 
 Client.prototype.onConnectionFailed = function() {
 	this.emit( 'disconnect' );
-	if ( this.reconnect ) this.reconnectionTimer.start();
+	if ( this.reconnect ) {
+		this.reconnectionTimer.start();
+	}
 };
 
 Client.prototype.onMessage = function( message ) {
@@ -113,7 +117,7 @@ Client.prototype.onUnauthorized = function( details ) {
 };
 
 Client.prototype.parseMessage = function( event ) {
-	var data = event.data,
+	let data = event.data,
 		marker = data.indexOf( ':' ),
 		prefix = data.slice( 0, marker ),
 		channelId = parseInt( prefix ),
@@ -171,7 +175,9 @@ Client.prototype.end = function() {
 Client.prototype.onClose = function() {
 	this.connection = null;
 	this.heartbeat.stop();
-	if ( this.reconnect !== false ) this.reconnectionTimer.start();
+	if ( this.reconnect !== false ) {
+		this.reconnectionTimer.start();
+	}
 	this.emit( 'close' );
 };
 
@@ -186,7 +192,9 @@ function Heartbeat( seconds, onBeat ) {
 	this.seconds = seconds;
 	EventEmitter.call( this );
 
-	if ( onBeat ) this.on( 'beat', onBeat );
+	if ( onBeat ) {
+		this.on( 'beat', onBeat );
+	}
 }
 
 inherits( Heartbeat, EventEmitter );
@@ -229,7 +237,9 @@ function ReconnectionTimer( interval, onTripped ) {
 		return 1000;
 	};
 
-	if ( onTripped ) this.on( 'tripped', onTripped );
+	if ( onTripped ) {
+		this.on( 'tripped', onTripped );
+	}
 
 	this.reset();
 }

@@ -1,6 +1,6 @@
 
 export default function( data ) {
-	var dataMark = data.indexOf( '\n' ),
+	let dataMark = data.indexOf( '\n' ),
 		versionMark = data.indexOf( '.' ),
 		id = data.slice( 0, versionMark ),
 		version = parseInt( data.slice( versionMark + 1, dataMark ) ),
