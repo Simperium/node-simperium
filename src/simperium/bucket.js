@@ -33,7 +33,9 @@ Bucket.prototype.update = function( id, data, options, callback ) {
 
 Bucket.prototype.touch = function( id, callback ) {
 	return this.store.get( id, ( e, object ) => {
-		if ( e ) {return callback( e );}
+		if ( e ) {
+			return callback( e );
+		}
 		this.update( object.id, object.data, callback );
 	} );
 };

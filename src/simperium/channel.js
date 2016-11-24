@@ -41,7 +41,9 @@ internal.buildModifyChange = function( id, object, ghost ) {
 		}
 	}
 
-	if ( empty ) {return this.emit( 'unmodified', id, object, ghost );}
+	if ( empty ) {
+		return this.emit( 'unmodified', id, object, ghost );
+	}
 
 	// if the change v is an empty object, do not send, notify?
 	this.localQueue.queue( payload );
@@ -247,16 +249,26 @@ export default function Channel( appid, access_token, bucket, store ) {
 		}
 
 		return update.call( bucket, id, object, options, function( err, object ) {
-			if ( ! err ) {bucket.emit( 'update', id, object.data );}
-			if ( ! err && options.sync !== false ) {bucketEvents.emit( 'update', id, object.data );}
-			if ( callback ) {callback.apply( this, arguments );}
+			if ( ! err ) {
+				bucket.emit( 'update', id, object.data );
+			}
+			if ( ! err && options.sync !== false ) {
+				bucketEvents.emit( 'update', id, object.data );
+			}
+			if ( callback ) {
+				callback.apply( this, arguments );
+			}
 		} );
 	};
 
 	bucket.remove = function( id, callback ) {
 		return remove.call( bucket, id, function( err ) {
-			if ( ! err ) {bucketEvents.emit( 'remove', id );}
-			if ( callback ) {callback.apply( this, arguments );}
+			if ( ! err ) {
+				bucketEvents.emit( 'remove', id );
+			}
+			if ( callback ) {
+				callback.apply( this, arguments );
+			}
 		} );
 	};
 
@@ -447,7 +459,9 @@ Queue.prototype.add = function( fn ) {
 };
 
 Queue.prototype.start = function() {
-	if ( this.running ) {return;}
+	if ( this.running ) {
+		return;
+	}
 	this.running = true;
 	this.emit( 'start' );
 	setImmediate( this.run.bind( this ) );
@@ -504,7 +518,9 @@ LocalQueue.prototype.queue = function( change ) {
 
 	this.emit( 'queued', change.id, change, queue );
 
-	if ( ! this.ready ) {return;}
+	if ( ! this.ready ) {
+		return;
+	}
 
 	this.processQueue( change.id );
 }
@@ -531,7 +547,9 @@ LocalQueue.prototype.processQueue = function( id ) {
 	const compressAndSend = this.compressAndSend.bind( this, id );
 
 	// there is no queue, don't do anything
-	if ( ! queue ) {return;}
+	if ( ! queue ) {
+		return;
+	}
 
 	// queue is empty, delete it from memory
 	if ( queue.length === 0 ) {

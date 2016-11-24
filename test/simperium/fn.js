@@ -4,7 +4,9 @@ function when( check, fn ) {
 	const args = [].slice.call( arguments, 2 );
 
 	return function() {
-		if ( check() ) {return fn.apply( this, args.concat( [].slice.call( arguments ) ) );}
+		if ( check() ) {
+			return fn.apply( this, args.concat( [].slice.call( arguments ) ) );
+		}
 	};
 }
 
@@ -23,7 +25,9 @@ function counts( total, fn ) {
 	let args = [].slice.call( arguments, 2 ),
 		count = 0,
 		counter = function() {
-			if ( count === total ) {return true;}
+			if ( count === total ) {
+				return true;
+			}
 			count++;
 			return false;
 		};

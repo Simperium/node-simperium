@@ -50,14 +50,14 @@ describe( 'Channel', function() {
 			version = 1,
 			data		= { content: 'Lol' },
 			changes = [ { sv: version,
-									o: 'M',
-									id: id,
-									clientid: 'sjs-2013070502-a1fab97d463883d66bae',
-									v: diff( data, { content: 'hola mundo' } ),
-									ev: 106,
-									cv: '5262d90aba5fdc4ed7eb2bc7',
-									ccids: [ 'ebd2c21c8a91be24c078746d9e935a3a' ]
-								} ];
+				o: 'M',
+				id: id,
+				clientid: 'sjs-2013070502-a1fab97d463883d66bae',
+				v: diff( data, { content: 'hola mundo' } ),
+				ev: 106,
+				cv: '5262d90aba5fdc4ed7eb2bc7',
+				ccids: [ 'ebd2c21c8a91be24c078746d9e935a3a' ]
+			} ];
 
 		channel.once( 'update', function( id, data ) {
 			assert.equal( data.content, 'Lol' );
@@ -304,7 +304,9 @@ describe( 'Channel', function() {
 			} );
 
 			bucket.getRevisions( key, function( err, revisions ) {
-				if ( err ) {return done( err );}
+				if ( err ) {
+					return done( err );
+				}
 				assert.equal( 8, revisions.length );
 				done();
 			} );

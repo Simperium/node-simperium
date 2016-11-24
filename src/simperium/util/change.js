@@ -33,9 +33,13 @@ function buildChangeFromOrigin( type, id, version, target, origin ) {
 	};
 
 	// Remove operations have no source version or diff
-	if ( type === changeTypes.REMOVE ) {return changeData;}
+	if ( type === changeTypes.REMOVE ) {
+		return changeData;
+	}
 
-	if ( version > 0 ) {changeData.sv = version;}
+	if ( version > 0 ) {
+		changeData.sv = version;
+	}
 
 	changeData.v = object_diff( origin, target );
 
@@ -55,12 +59,18 @@ function compressChanges( changes, origin ) {
 
 	modified = changes.reduce( function( from, change ) {
 		// deletes when, any changes after a delete are ignored
-		if ( from === null ) {return null;}
-		if ( from.o === changeTypes.REMOVE ) {return null;}
+		if ( from === null ) {
+			return null;
+		}
+		if ( from.o === changeTypes.REMOVE ) {
+			return null;
+		}
 		return apply_object_diff( from, change.v );
 	}, origin );
 
-	if ( modified === null ) {return null;}
+	if ( modified === null ) {
+		return null;
+	}
 
 	return object_diff( origin, modified );
 }

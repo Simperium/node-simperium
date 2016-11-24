@@ -69,7 +69,9 @@ Client.prototype.bucket = function( name ) {
 		channel.access_token = token;
 	} );
 
-	if ( this.open ) {channel.onConnect();}
+	if ( this.open ) {
+		channel.onConnect();
+	}
 
 	return bucket;
 };
@@ -99,7 +101,9 @@ Client.prototype.onConnectionTimeout = function() {
 
 Client.prototype.onConnectionFailed = function() {
 	this.emit( 'disconnect' );
-	if ( this.reconnect ) {this.reconnectionTimer.start();}
+	if ( this.reconnect ) {
+		this.reconnectionTimer.start();
+	}
 };
 
 Client.prototype.onMessage = function( message ) {
@@ -171,7 +175,9 @@ Client.prototype.end = function() {
 Client.prototype.onClose = function() {
 	this.connection = null;
 	this.heartbeat.stop();
-	if ( this.reconnect !== false ) {this.reconnectionTimer.start();}
+	if ( this.reconnect !== false ) {
+		this.reconnectionTimer.start();
+	}
 	this.emit( 'close' );
 };
 
@@ -186,7 +192,9 @@ function Heartbeat( seconds, onBeat ) {
 	this.seconds = seconds;
 	EventEmitter.call( this );
 
-	if ( onBeat ) {this.on( 'beat', onBeat );}
+	if ( onBeat ) {
+		this.on( 'beat', onBeat );
+	}
 }
 
 inherits( Heartbeat, EventEmitter );
@@ -229,7 +237,9 @@ function ReconnectionTimer( interval, onTripped ) {
 		return 1000;
 	};
 
-	if ( onTripped ) {this.on( 'tripped', onTripped );}
+	if ( onTripped ) {
+		this.on( 'tripped', onTripped );
+	}
 
 	this.reset();
 }

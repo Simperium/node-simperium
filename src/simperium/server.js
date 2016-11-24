@@ -45,7 +45,9 @@ Session.prototype.onMessage = function( msg ) {
 
 	if ( channelId === 'h' ) {
 		i = parseInt( message.data );
-		if ( isNaN( i ) ) {i = 0;}
+		if ( isNaN( i ) ) {
+			i = 0;
+		}
 		this.connection.send( format( 'h:%d', i + 1 ) );
 		return;
 	}
@@ -107,7 +109,9 @@ Channel.prototype.init = function( data ) {
 	this.bucket = this.settings.bucketAdapter();
 
 	this.bucket.initialize( options, function( e, user ) {
-		if ( e ) {return emit( 'unauthorized', e );}
+		if ( e ) {
+			return emit( 'unauthorized', e );
+		}
 		emit( 'send', format( 'auth:%s', user.email ) );
 	} );
 };
