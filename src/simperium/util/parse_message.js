@@ -4,5 +4,5 @@ export default function( data ) {
 	return {
 		command: data.slice( 0, marker ),
 		data: data.slice( marker + 1 )
-	}
+	};
 }

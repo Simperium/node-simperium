@@ -1,5 +1,5 @@
-import { EventEmitter } from 'events'
-import { inherits } from 'util'
+import { EventEmitter } from 'events';
+import { inherits } from 'util';
 import uuid from 'node-uuid';
 
 export default function Bucket( name, storeProvider ) {
@@ -49,4 +49,4 @@ Bucket.prototype.find = function( query, callback ) {
 Bucket.prototype.getRevisions = function( id, callback ) {
 	// Overridden in Channel
 	callback( new Error( 'Failed to fetch revisions for' + id ) );
-}
+};

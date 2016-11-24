@@ -28,4 +28,4 @@ BucketStore.prototype.find = function( query, callback ) {
 		objects.push( {id: key, data: this.objects[key] } );
 	}
 	callback( null, objects );
-}
+};

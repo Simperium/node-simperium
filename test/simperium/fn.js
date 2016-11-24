@@ -1,4 +1,4 @@
-export { when, counts, debounce, times }
+export { when, counts, debounce, times };
 
 function when( check, fn ) {
 	var args = [].slice.call( arguments, 2 );

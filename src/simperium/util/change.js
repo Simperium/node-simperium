@@ -1,5 +1,5 @@
-import uuid from 'node-uuid'
-import jsondiff from '../jsondiff'
+import uuid from 'node-uuid';
+import jsondiff from '../jsondiff';
 
 const changeTypes = {
 	MODIFY: 'M',
@@ -7,7 +7,7 @@ const changeTypes = {
 	ADD: '+'
 };
 
-const { object_diff, transform_object_diff, apply_object_diff } = jsondiff( {list_diff: false} )
+const { object_diff, transform_object_diff, apply_object_diff } = jsondiff( {list_diff: false} );
 
 export {
 	changeTypes as type,
@@ -15,7 +15,7 @@ export {
 	rebase as transform,
 	modify,
 	apply_diff as apply
-}
+};
 
 function modify( id, version, patch ) {
 	return { o: changeTypes.MODIFY, id: id, ccid: uuid.v4(), v: patch };

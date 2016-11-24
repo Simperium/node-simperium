@@ -6,4 +6,4 @@ export default function User( options ) {
 User.fromJSON = function( json ) {
 	var data = JSON.parse( json );
 	return new User( data );
-}
+};

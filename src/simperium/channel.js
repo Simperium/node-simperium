@@ -1,11 +1,11 @@
 /*eslint no-shadow: 0*/
-import { format, inherits } from 'util'
-import { EventEmitter } from 'events'
-import { parseMessage, parseVersionMessage, change as change_util } from './util'
-import JSONDiff from './jsondiff'
-import uuid from 'node-uuid'
+import { format, inherits } from 'util';
+import { EventEmitter } from 'events';
+import { parseMessage, parseVersionMessage, change as change_util } from './util';
+import JSONDiff from './jsondiff';
+import uuid from 'node-uuid';
 
-const jsondiff = new JSONDiff( {list_diff: false} )
+const jsondiff = new JSONDiff( {list_diff: false} );
 
 var operation = {
 	MODIFY: 'M',
@@ -177,7 +177,7 @@ internal.applyChange = function( change, ghost ) {
 	} else if ( change.o === operation.REMOVE ) {
 		return internal.removeObject.bind( this )( change.id, acknowledged ).then( emit );
 	}
-}
+};
 
 internal.handleChangeError = function( err, change, acknowledged ) {
 	switch ( err.code ) {
@@ -187,7 +187,7 @@ internal.handleChangeError = function( err, change, acknowledged ) {
 		default:
 			this.emit( 'error', err, change );
 	}
-}
+};
 
 internal.indexingComplete = function() {
 	// Indexing has finished
@@ -197,8 +197,8 @@ internal.indexingComplete = function() {
 	this.index_last_id = null;
 	this.index_cv = null;
 	this.bucket.removeListener( 'update', this.bucketUpdateListener );
-	this.emit( 'ready' )
-}
+	this.emit( 'ready' );
+};
 
 export default function Channel( appid, access_token, bucket, store ) {
 	var channel = this;
@@ -234,7 +234,7 @@ export default function Channel( appid, access_token, bucket, store ) {
 	} );
 
 	// forward errors to bucket instance
-	this.on( 'error', bucket.emit.bind( bucket, 'error' ) )
+	this.on( 'error', bucket.emit.bind( bucket, 'error' ) );
 
 	bucket.update = function( id, object, options, callback ) {
 		if ( typeof options === 'function' ) {
@@ -327,7 +327,7 @@ Channel.prototype.onAuth = function( data ) {
 		// request cv and then send method
 		this.once( 'ready', () => {
 			this.localQueue.resendSentChanges();
-		} )
+		} );
 		init = ( cv ) => {
 			if ( cv ) {
 				this.localQueue.start();
@@ -377,7 +377,7 @@ Channel.prototype.onIndex = function( data ) {
 			this.index_last_id = objectId;
 		}
 		if ( !this.index_last_id ) {
-			internal.indexingComplete.call( this )
+			internal.indexingComplete.call( this );
 		}
 		this.index_cv = cv;
 	} else {
@@ -451,7 +451,7 @@ Queue.prototype.start = function() {
 	this.running = true;
 	this.emit( 'start' );
 	setImmediate( this.run.bind( this ) );
-}
+};
 
 Queue.prototype.run = function() {
 	var fn;
@@ -465,7 +465,7 @@ Queue.prototype.run = function() {
 
 	fn = this.queue.shift();
 	fn( this.run.bind( this ) );
-}
+};
 
 function LocalQueue( store ) {
 	this.store = store;
@@ -482,7 +482,7 @@ LocalQueue.prototype.start = function() {
 	for ( queueId in this.queues ) {
 		this.processQueue( queueId );
 	}
-}
+};
 
 LocalQueue.prototype.acknowledge = function( change ) {
 	if ( this.sent[change.id] === change ) {
@@ -490,7 +490,7 @@ LocalQueue.prototype.acknowledge = function( change ) {
 	}
 
 	this.processQueue( change.id );
-}
+};
 
 LocalQueue.prototype.queue = function( change ) {
 	var queue = this.queues[change.id];
@@ -546,7 +546,7 @@ LocalQueue.prototype.processQueue = function( id ) {
 	}
 
 	this.store.get( id ).then( compressAndSend );
-}
+};
 
 LocalQueue.prototype.compressAndSend = function( id, ghost ) {
 	var changes = this.queues[id];
@@ -591,13 +591,13 @@ LocalQueue.prototype.compressAndSend = function( id, ghost ) {
 
 	this.sent[id] = change;
 	this.emit( 'send', change );
-}
+};
 
 LocalQueue.prototype.resendSentChanges = function() {
 	for ( let ccid in this.sent ) {
-		this.emit( 'send', this.sent[ccid] )
+		this.emit( 'send', this.sent[ccid] );
 	}
-}
+};
 
 function collectionRevisions( channel, id, callback ) {
 	var expectedVersions = -1;

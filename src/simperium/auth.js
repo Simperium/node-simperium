@@ -1,8 +1,8 @@
-import { EventEmitter } from 'events'
-import User from './user'
-import { format, inherits } from 'util'
-import https from 'https'
-import url from 'url'
+import { EventEmitter } from 'events';
+import User from './user';
+import { format, inherits } from 'util';
+import https from 'https';
+import url from 'url';
 
 const URL = 'https://auth.simperium.com/1';
 
@@ -18,17 +18,17 @@ Auth.prototype.authorize = function( username, password ) {
 		promise = this.request( 'authorize/', body );
 
 	return promise;
-}
+};
 
 // TODO: username and password to create a user
 Auth.prototype.create = function() {
 
-}
+};
 
 Auth.prototype.getUrlOptions = function( path ) {
 	const options = url.parse( format( '%s/%s/%s', URL, this.appId, path ) );
 	return Object.assign( options, { method: 'POST', headers: {'X-Simperium-API-Key': this.appSecret}} );
-}
+};
 
 Auth.prototype.request = function( endpoint, body ) {
 	return new Promise( ( resolve, reject ) => {
@@ -58,4 +58,4 @@ Auth.prototype.request = function( endpoint, body ) {
 
 		req.end( body );
 	} );
-}
+};

@@ -1,5 +1,5 @@
-import assert from 'assert'
-import * as fn from './fn'
+import assert from 'assert';
+import * as fn from './fn';
 
 describe( 'util.fn', function() {
 	describe( 'when', function() {

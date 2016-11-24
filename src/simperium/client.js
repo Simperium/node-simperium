@@ -1,9 +1,9 @@
-import { format, inherits } from 'util'
-import { EventEmitter } from 'events'
-import Bucket from './bucket'
-import Channel from './channel'
-import defaultGhostStoreProvider from './ghost/default'
-import defaultObjectStoreProvider from './storage/default'
+import { format, inherits } from 'util';
+import { EventEmitter } from 'events';
+import Bucket from './bucket';
+import Channel from './channel';
+import defaultGhostStoreProvider from './ghost/default';
+import defaultObjectStoreProvider from './storage/default';
 
 var WebSocketClient;
 if ( typeof window !== 'undefined' && window.WebSocket ) {

@@ -1,8 +1,8 @@
-import { server as WebSocketServer } from 'websocket'
-import http from 'http'
-import { inherits, format } from 'util'
-import { EventEmitter } from 'events'
-import { parseMessage } from './util'
+import { server as WebSocketServer } from 'websocket';
+import http from 'http';
+import { inherits, format } from 'util';
+import { EventEmitter } from 'events';
+import { parseMessage } from './util';
 
 var datasource = new DataSource();
 

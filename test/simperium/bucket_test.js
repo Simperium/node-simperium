@@ -1,6 +1,6 @@
-import assert from 'assert'
-import Bucket from '../../src/simperium/bucket'
-import storeProvider from './mock_bucket_store'
+import assert from 'assert';
+import Bucket from '../../src/simperium/bucket';
+import storeProvider from './mock_bucket_store';
 
 describe( 'Bucket', function() {
 	var bucket, store;
@@ -36,14 +36,14 @@ describe( 'Bucket', function() {
 
 	it( 'should update with options', function( done ) {
 		var id = 'thing',
-			object = {one: 'two'}
+			object = {one: 'two'};
 
 		bucket.update( id, object, {}, function() {
 			bucket.get( id, function( err, savedObject ) {
 				assert.deepEqual( object, savedObject );
 				done();
-			} )
-		} )
+			} );
+		} );
 	} );
 
 	it( 'should delete object data', function( done ) {

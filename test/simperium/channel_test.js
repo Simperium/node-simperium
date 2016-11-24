@@ -1,22 +1,22 @@
 /*eslint no-shadow: 0*/
-import Channel from '../../src/simperium/channel'
-import util from 'util'
-import { parseMessage } from '../../src/simperium/util'
-import assert, { equal, ok } from 'assert'
-import * as fn from './fn'
-import jsondiff from '../../src/simperium/jsondiff'
-import defaultGhostStoreProvider from '../../src/simperium/ghost/default'
-import uuid from 'node-uuid'
-import Bucket from '../../src/simperium/bucket'
-import mockBucketStore from './mock_bucket_store'
+import Channel from '../../src/simperium/channel';
+import util from 'util';
+import { parseMessage } from '../../src/simperium/util';
+import assert, { equal, ok } from 'assert';
+import * as fn from './fn';
+import jsondiff from '../../src/simperium/jsondiff';
+import defaultGhostStoreProvider from '../../src/simperium/ghost/default';
+import uuid from 'node-uuid';
+import Bucket from '../../src/simperium/bucket';
+import mockBucketStore from './mock_bucket_store';
 
-const differ = jsondiff()
-const diff = differ.object_diff.bind( differ )
+const differ = jsondiff();
+const diff = differ.object_diff.bind( differ );
 const cycle = ( ... fns ) => ( ... args ) => {
-	const [ head, ... rest ] = fns
-	head( ... args )
-	fns = rest.concat( head )
-}
+	const [ head, ... rest ] = fns;
+	head( ... args );
+	fns = rest.concat( head );
+};
 
 describe( 'Channel', function() {
 	var channel, bucket, store;
@@ -137,7 +137,7 @@ describe( 'Channel', function() {
 
 			channel.on( 'send', function() {
 				bucket.update( objectId, data2 );
-			} )
+			} );
 
 			channel.localQueue.on( 'wait', function( id ) {
 				assert.equal( id, objectId );
@@ -164,28 +164,28 @@ describe( 'Channel', function() {
 		} );
 
 		it( 'should ignore duplicate change error if nothing to acknowledge', ( done ) => {
-			let id = 'mock-id', ccid = 'mock-ccid'
+			let id = 'mock-id', ccid = 'mock-ccid';
 			// queue should emit a finish event when the change is processed
-			channel.networkQueue.queueFor( id ).on( 'finish', () => done() )
-			channel.handleMessage( 'c:' + JSON.stringify( [ { ccids: [ ccid ], error: 409, id }] ) )
-		} )
+			channel.networkQueue.queueFor( id ).on( 'finish', () => done() );
+			channel.handleMessage( 'c:' + JSON.stringify( [ { ccids: [ ccid ], error: 409, id }] ) );
+		} );
 
 		it( 'should resend sent but unacknowledged changes on reconnect', () => new Promise( resolve => {
-			channel.localQueue.sent['fake-ccid'] = { fake: 'change', ccid: 'fake-ccid' }
+			channel.localQueue.sent['fake-ccid'] = { fake: 'change', ccid: 'fake-ccid' };
 
 			channel.on( 'send', cycle(
 				m => setImmediate( () => {
-					equal( m, 'i:1:::10' )
-					channel.handleMessage( 'i:{"index":[],"current":"cv"}' )
+					equal( m, 'i:1:::10' );
+					channel.handleMessage( 'i:{"index":[],"current":"cv"}' );
 				} ),
 				m => setImmediate( () => {
-					equal( m, 'c:{"fake":"change","ccid":"fake-ccid"}' )
-					resolve()
+					equal( m, 'c:{"fake":"change","ccid":"fake-ccid"}' );
+					resolve();
 				} )
-			) )
+			) );
 
-			channel.handleMessage( 'auth:user@example.com' )
-		} ) )
+			channel.handleMessage( 'auth:user@example.com' );
+		} ) );
 
 		it( 'should send remove operation', function( done ) {
 			channel.on( 'send', function( msg ) {
@@ -251,9 +251,9 @@ describe( 'Channel', function() {
 		} );
 
 		it( 'should emit ready after receiving changes', ( done ) => {
-			channel.on( 'ready', () => done() )
+			channel.on( 'ready', () => done() );
 			channel.handleMessage( 'c:[]' );
-		} )
+		} );
 
 		it( 'should notify bucket after network deletion', function( done ) {
 			var key = 'deleteTest';
@@ -326,7 +326,7 @@ describe( 'Channel', function() {
 			channel.on( 'update', function( key, data ) {
 				setImmediate( function() {
 					assert.equal( data.title, 'Goodbye kansas' );
-				} )
+				} );
 			} );
 
 			channel.on( 'send', function() {
@@ -344,14 +344,14 @@ describe( 'Channel', function() {
 		} );
 
 		it( 'should emit errors on the bucket instance', function( done ) {
-			const error = {error: 404, id: 'thing', ccids: ['abc']}
+			const error = {error: 404, id: 'thing', ccids: ['abc']};
 			bucket.on( 'error', ( e ) => {
 				process.nextTick( () => {
-					equal( 404, e.code )
-					equal( `${ e.code } - Could not apply change to: ${error.id}`, e.message )
-					done()
-				} )
-			} )
+					equal( 404, e.code );
+					equal( `${ e.code } - Could not apply change to: ${error.id}`, e.message );
+					done();
+				} );
+			} );
 			channel.handleMessage( 'c:' + JSON.stringify( [ error ] ) );
 		} );
 
@@ -426,7 +426,7 @@ describe( 'Channel', function() {
 					assert.equal( 'cv', message.command );
 					assert.equal( cv, message.data );
 					done();
-				} )
+				} );
 			} );
 
 			store.setChangeVersion( cv ).then( function() {
@@ -436,16 +436,16 @@ describe( 'Channel', function() {
 
 		it( 'should emit index and ready event when index complete', () => new Promise( resolve => {
 			var page = 'i:{"index":[{"id":"objectid","v":1,"d":{"title":"Hello World"}}],"current":"cv"}';
-			let indexed = false
+			let indexed = false;
 			channel.on( 'index', function( cv ) {
 				assert.equal( 'cv', cv );
 				assert( !bucket.isIndexing );
-				indexed = true
+				indexed = true;
 			} );
 			channel.on( 'ready', () => {
-				ok( indexed )
-				resolve()
-			} )
+				ok( indexed );
+				resolve();
+			} );
 			channel.handleMessage( page );
 		} ) );
 
