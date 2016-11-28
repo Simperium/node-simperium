@@ -141,10 +141,10 @@ internal.requestObjectVersion = function( id, version ) {
 	return new Promise( resolve => {
 		this.once( `version.${ id }.${ version }`, data => {
 			resolve( data );
-		} )
-		this.send( `e:${ id }.${ version }` )
-	} )
-}
+		} );
+		this.send( `e:${ id }.${ version }` );
+	} );
+};
 
 internal.applyChange = function( change, ghost ) {
 	var acknowledged = internal.findAcknowledgedChange.bind( this )( change ),

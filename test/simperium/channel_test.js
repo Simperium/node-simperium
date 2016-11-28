@@ -464,15 +464,15 @@ describe( 'Channel', function() {
 		it( 'should request entire object when source version is out of date', ( done ) => {
 			var change = {o: 'M', id: 'thing', sv: 1, ev: 2, ccid: 'abc', cv: 'new-cv', v: diff( { hello: 'mundo'}, {hello: 'world'} ) };
 			channel.once( 'send', ( data ) => {
-				equal( data, `e:${change.id}.${change.sv}` )
+				equal( data, `e:${change.id}.${change.sv}` );
 				channel.once( 'change-version', ( cv ) => {
-					equal( cv, 'new-cv' )
-					done()
-				} )
-				channel.handleMessage( `e:${change.id}.${change.sv}\n${JSON.stringify( { data: { hello: 'mundo'} } )} ` )
-			} )
-			channel.handleMessage( `c:[${JSON.stringify( change )}]` )
-		} )
+					equal( cv, 'new-cv' );
+					done();
+				} );
+				channel.handleMessage( `e:${change.id}.${change.sv}\n${JSON.stringify( { data: { hello: 'mundo'} } )} ` );
+			} );
+			channel.handleMessage( `c:[${JSON.stringify( change )}]` );
+		} );
 	} );
 } );
 
