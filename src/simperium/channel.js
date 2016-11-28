@@ -139,6 +139,15 @@ internal.findAcknowledgedChange = function( change ) {
 	}
 };
 
+internal.requestObjectVersion = function( id, version ) {
+	return new Promise( resolve => {
+		this.once( `version.${ id }.${ version }`, data => {
+			resolve( data );
+		} );
+		this.send( `e:${ id }.${ version }` );
+	} );
+};
+
 internal.applyChange = function( change, ghost ) {
 	var acknowledged = internal.findAcknowledgedChange.bind( this )( change ),
 		error,
@@ -166,14 +175,15 @@ internal.applyChange = function( change, ghost ) {
 
 	if ( change.o === operation.MODIFY ) {
 		if ( ghost && ( ghost.version !== change.sv ) ) {
-			// throw new Error( "Source version and ghost version do not match" );
+			internal.requestObjectVersion.call( this, change.id, change.sv ).then( data => {
+				internal.applyChange.call( this, change, { version: change.sv, data } )
+			} );
 			return;
 		}
 
 		original = ghost.data;
 		patch = change.v;
 		modified = jsondiff.apply_object_diff( original, patch );
-
 		return internal.updateObjectVersion.bind( this )( change.id, change.ev, modified, original, patch, acknowledged )
 			.then( emit );
 	} else if ( change.o === operation.REMOVE ) {
@@ -424,6 +434,7 @@ Channel.prototype.onVersion = function( data ) {
 
 	this.emit( 'version', ghost.id, ghost.version, ghost.data );
 	this.emit( 'version.' + ghost.id, ghost.id, ghost.version, ghost.data );
+	this.emit( 'version.' + ghost.id + '.' + ghost.version, ghost.data );
 };
 
 function NetworkQueue() {
