@@ -7,6 +7,8 @@ import uuid from 'node-uuid'
 
 const jsondiff = new JSONDiff( {list_diff: false} )
 
+const UNKNOWN_CV = '?'
+
 var operation = {
 	MODIFY: 'M',
 	REMOVE: '-'
@@ -218,6 +220,7 @@ export default function Channel( appid, access_token, bucket, store ) {
 	message.on( 'i', this.onIndex.bind( this ) );
 	message.on( 'c', this.onChanges.bind( this ) );
 	message.on( 'e', this.onVersion.bind( this ) );
+	message.on( 'cv', this.onChangeVersion.bind( this ) );
 	message.on( 'o', function() {} );
 
 	this.networkQueue = new NetworkQueue();
@@ -333,9 +336,7 @@ Channel.prototype.onAuth = function( data ) {
 				this.localQueue.start();
 				this.sendChangeVersionRequest( cv );
 			} else {
-				this.bucket.isIndexing = true;
-				this.bucket.emit( 'indexing' );
-				this.sendIndexRequest();
+				this.startIndexing();
 			}
 		};
 
@@ -343,6 +344,13 @@ Channel.prototype.onAuth = function( data ) {
 
 		return;
 	}
+};
+
+Channel.prototype.startIndexing = function() {
+	this.localQueue.pause();
+	this.bucket.isIndexing = true;
+	this.bucket.emit( 'indexing' );
+	this.sendIndexRequest();
 };
 
 Channel.prototype.onConnect = function() {
@@ -383,8 +391,7 @@ Channel.prototype.onIndex = function( data ) {
 	} else {
 		this.sendIndexRequest( mark );
 	}
-}
-;
+};
 
 Channel.prototype.sendIndexRequest = function( mark ) {
 	this.send( format( 'i:1:%s::10', mark ? mark : '' ) );
@@ -403,8 +410,14 @@ Channel.prototype.onChanges = function( data ) {
 	} );
 	// emit ready after all server changes have been applied
 	this.emit( 'ready' );
-}
-;
+};
+
+Channel.prototype.onChangeVersion = function( data ) {
+	if ( data === UNKNOWN_CV ) {
+		this.store.setChangeVersion( null )
+			.then( () => this.startIndexing() );
+	}
+};
 
 Channel.prototype.onVersion = function( data ) {
 	var ghost = parseVersionMessage( data );
@@ -483,6 +496,10 @@ LocalQueue.prototype.start = function() {
 		this.processQueue( queueId );
 	}
 }
+
+LocalQueue.prototype.pause = function() {
+	this.ready = false;
+};
 
 LocalQueue.prototype.acknowledge = function( change ) {
 	if ( this.sent[change.id] === change ) {

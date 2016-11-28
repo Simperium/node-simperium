@@ -385,6 +385,16 @@ describe( 'Channel', function() {
 		} );
 	} );
 
+	it( 'should request index when cv is unknown', done => {
+		channel.once( 'send', ( data ) => {
+			ok( !store.cv );
+			ok( bucket.isIndexing );
+			equal( data, 'i:1:::10' );
+			done();
+		} );
+		channel.handleMessage( 'cv:?' );
+	} );
+
 	// TODO: handle auth failures
 	// <=	 0:auth:expired
 	// =>	 0:i:1:::10
