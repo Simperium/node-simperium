@@ -351,7 +351,7 @@ Channel.prototype.startIndexing = function() {
 	this.bucket.isIndexing = true;
 	this.bucket.emit( 'indexing' );
 	this.sendIndexRequest();
-}
+};
 
 Channel.prototype.onConnect = function() {
 	var init = {
@@ -391,8 +391,7 @@ Channel.prototype.onIndex = function( data ) {
 	} else {
 		this.sendIndexRequest( mark );
 	}
-}
-;
+};
 
 Channel.prototype.sendIndexRequest = function( mark ) {
 	this.send( format( 'i:1:%s::10', mark ? mark : '' ) );
@@ -416,9 +415,9 @@ Channel.prototype.onChanges = function( data ) {
 Channel.prototype.onChangeVersion = function( data ) {
 	if ( data === UNKNOWN_CV ) {
 		this.store.setChangeVersion( null )
-		.then( () => this.startIndexing() )
+			.then( () => this.startIndexing() );
 	}
-}
+};
 
 Channel.prototype.onVersion = function( data ) {
 	var ghost = parseVersionMessage( data );
@@ -500,7 +499,7 @@ LocalQueue.prototype.start = function() {
 
 LocalQueue.prototype.pause = function() {
 	this.ready = false;
-}
+};
 
 LocalQueue.prototype.acknowledge = function( change ) {
 	if ( this.sent[change.id] === change ) {
