@@ -199,9 +199,11 @@ internal.handleChangeError = function( err, change, acknowledged ) {
 		case CODE_INVALID_VERSION:
 		case CODE_INVALID_DIFF: // Invalid version or diff, send full object back to server
 			if ( ! change.hasSentFullObject ) {
-				change.d = this.store.get( change.id );
-				change.hasSentFullObject = true;
-				this.localQueue.queue( change );
+				this.store.get( change.id ).then( object => {
+					change.d = object;
+					change.hasSentFullObject = true;
+					this.localQueue.queue( change );
+				} );
 			} else {
 				this.localQueue.dequeueChangesFor( change.id );
 			}
