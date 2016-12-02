@@ -5,9 +5,12 @@ import { parseMessage, parseVersionMessage, change as change_util } from './util
 import JSONDiff from './jsondiff'
 import uuid from 'node-uuid'
 
-const jsondiff = new JSONDiff( {list_diff: false} )
+const jsondiff = new JSONDiff( {list_diff: false} );
 
-const UNKNOWN_CV = '?'
+const UNKNOWN_CV = '?';
+const CODE_INVALID_VERSION = 405;
+const CODE_EMPTY_RESPONSE = 412;
+const CODE_INVALID_DIFF = 440;
 
 var operation = {
 	MODIFY: 'M',
@@ -193,7 +196,20 @@ internal.applyChange = function( change, ghost ) {
 
 internal.handleChangeError = function( err, change, acknowledged ) {
 	switch ( err.code ) {
-		case 412: // Change causes no change, just acknowledge it
+		case CODE_INVALID_VERSION:
+		case CODE_INVALID_DIFF: // Invalid version or diff, send full object back to server
+			if ( ! change.hasSentFullObject ) {
+				this.store.get( change.id ).then( object => {
+					change.d = object;
+					change.hasSentFullObject = true;
+					this.localQueue.queue( change );
+				} );
+			} else {
+				this.localQueue.dequeueChangesFor( change.id );
+			}
+
+			break;
+		case CODE_EMPTY_RESPONSE: // Change causes no change, just acknowledge it
 			internal.updateAcknowledged.call( this, acknowledged );
 			break;
 		default:
@@ -306,7 +322,6 @@ inherits( Channel, EventEmitter );
 
 Channel.prototype.handleMessage = function( data ) {
 	var message = parseMessage( data );
-
 	this.message.emit( message.command, message.data );
 };
 

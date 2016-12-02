@@ -383,6 +383,26 @@ describe( 'Channel', function() {
 				channel.localQueue.queue( change );
 			} );
 		} );
+
+		it( 'should send full object on 405 error', function( done ) {
+			// if a change is sent and a 405 is returned, the full object should be sent
+			// Add an object to the store
+			channel.store.put( 'thing', 1, {} );
+
+			// channel should not emit error during this change
+			channel.on( 'error', function( e ) {
+				done( e );
+			} );
+
+			// ensure that a change with a `d` property is added to the queue
+			channel.localQueue.once( 'queued', function( id, change, queue ) {
+				assert.ok( queue[0].d );
+				done();
+			} );
+
+			// send a 405 error
+			channel.handleMessage( 'c:' + JSON.stringify( [{error: 405, id: 'thing', ccids: ['abc']}] ) );
+		} );
 	} );
 
 	it( 'should request index when cv is unknown', done => {
