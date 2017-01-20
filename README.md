@@ -19,4 +19,4 @@ See [the example](sample/simplenote.js) to get an idea of how the API looks.
 
 Uses [Mocha][] for testing.
 
-[Mocha]: http://visionmedia.github.io/mocha/
+[Mocha]: http://mochajs.org/
