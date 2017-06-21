@@ -61,4 +61,33 @@ describe( 'Auth', () => {
 			done()
 		} )
 	} )
+
+	it( 'should create an account with valid credentials', ( done ) => {
+		stub( ( data, handler ) => {
+			const { username, password } = JSON.parse( data )
+			const response = new EventEmitter()
+			equal( username, 'username' )
+			equal( password, 'password' )
+
+			handler( response )
+			response.emit( 'data', '{\"access_token\": \"secret-token\"}' )
+			response.emit( 'end' );
+		} )
+
+		auth.create( 'username', 'password' )
+		.then( ( user ) => {
+			equal( user.access_token, 'secret-token' )
+			done()
+		} )
+	} )
+
+	it( 'should fail to create an account with invalid credentials', ( done ) => {
+		stubResponse( 'this is not json' )
+
+		auth.create( 'username', 'bad-password' )
+		.catch( ( e ) => {
+			equal( e.message, 'this is not json' )
+			done()
+		} )
+	} )
 } )
