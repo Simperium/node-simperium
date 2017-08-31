@@ -645,7 +645,7 @@ LocalQueue.prototype.resendSentChanges = function() {
 function collectionRevisions( channel, id, callback ) {
 	var expectedVersions = -1;
 	var onGhostRetrieved = function( ghost ) {
-		var version = Math.min( ghost.version, 30 );
+		var version = Math.min( ghost.version, 160 );
 		var i;
 		expectedVersions = version;
 
