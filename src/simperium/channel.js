@@ -645,6 +645,10 @@ LocalQueue.prototype.resendSentChanges = function() {
 function collectionRevisions( channel, id, callback ) {
 	var expectedVersions = -1;
 	var onGhostRetrieved = function( ghost ) {
+		// the default bucket options allow for storing
+		// the 60 most-recent revisions of a note plus
+		// 100 archive versions (these store one out of
+		// every ten versions). we'll get up to this many
 		var version = Math.min( ghost.version, 160 );
 		var i;
 		expectedVersions = version;
