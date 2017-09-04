@@ -643,39 +643,44 @@ LocalQueue.prototype.resendSentChanges = function() {
 }
 
 function collectionRevisions( channel, id, callback ) {
-	var expectedVersions = -1;
-	var onGhostRetrieved = function( ghost ) {
-		// the default bucket options allow for storing
-		// the 60 most-recent revisions of a note plus
-		// 100 archive versions (these store one out of
-		// every ten versions). we'll get up to this many
-		var version = Math.min( ghost.version, 160 );
-		var i;
-		expectedVersions = version;
+	let expectedVersions;
+	let timeout;
+	const TIMEOUT = 10000; // arbitrarily chosen delay
 
-		// Loop through requested revision count and request each version
-		for ( i = 0; i < version; i++ ) {
-			channel.send( 'e:' + id + '.' + ( ghost.version - i ) );
-		}
+	const versions = [];
+
+	const finish = listener => {
+		channel.removeListener( 'version.' + id, listener );
+		callback( null, versions.sort( ( a, b ) => a.version - b.version ) );
+		clearTimeout( timeout );
 	};
 
-	var versions = [];
-	var onVersion = function( id, version, data ) {
-		versions.push( {id: id, version: version, data: data} );
+	const onVersion = ( id, version, data ) => {
+		versions.push( { id, version, data } );
 
 		// Check if all versions have been collected
 		if ( expectedVersions === versions.length ) {
-			channel.removeListener( 'version.' + id, onVersion );
-			callback( null, versions.sort( function( a, b ) {
-				return a.version > b.version ? -1 : 1;
-			} ) );
+			finish( onVersion );
 		}
 	};
 
 	channel.on( 'version.' + id, onVersion );
 
-	channel.store.get( id ).then( onGhostRetrieved, function( e ) {
-		callback( e );
-	} );
+	channel.store.get( id ).then( ghost => {
+		// the default bucket options allow for storing
+		// the 60 most-recent revisions of a note plus
+		// 100 archive versions (these store one out of
+		// every ten versions). we'll get up to this many
+		const version = Math.min( ghost.version, 160 );
+		expectedVersions = version;
+
+		// Loop through requested revision count and request each version
+		for ( let i = 0; i < version; i++ ) {
+			channel.send( 'e:' + id + '.' + ( ghost.version - i ) );
+		}
+	}, callback );
+
+	// give up after a timeout
+	timeout = setTimeout( () => finish( onVersion ), TIMEOUT );
 }
 
