@@ -648,6 +648,16 @@ LocalQueue.prototype.resendSentChanges = function() {
 }
 
 /**
+ * Since revision data is basically immutable we can prevent the
+ * need to refetch it after it has been loaded once.
+ *
+ * E.g. key could be `${ entityId }.${ versionNumber }`
+ *
+ * @type {Map<String,Object>} stores specific revisions as a cache
+ */
+export const revisionCache = new Map();
+
+/**
  * Attempts to fetch an entity's revisions
  *
  * By default, a bucket stores two kinds of history:
@@ -692,6 +702,7 @@ function collectionRevisions( channel, id, callback ) {
 	 * @param {Object} data value of entity at revision
 	 */
 	function onVersion( id, version, data ) {
+		revisionCache.set( `${ id }.${ version }`, data );
 		versions.push( { id, version, data } );
 
 		// if we have every possible revision already, finish it!
@@ -726,7 +737,7 @@ function collectionRevisions( channel, id, callback ) {
 	 * @param {Number} prevVersion starting point for finding next version
 	 */
 	function fetchNextVersion( prevVersion ) {
-		let version = prevVersion - 1;
+		let version = prevVersion;
 
 		// find the next version to request
 		// some could have come back already
@@ -735,8 +746,19 @@ function collectionRevisions( channel, id, callback ) {
 			version -= 1;
 		}
 
-		channel.send( `e:${ id }.${ version }` );
+		// we have them all
+		if ( ! version ) {
+			return;
+		}
+
 		requestedVersions.add( version );
+
+		// fetch from server or local cache
+		if ( revisionCache.has( `${ id }.${ version }` ) ) {
+			onVersion( id, version, revisionCache.get( `${ id }.${ version }` ) );
+		} else {
+			channel.send( `e:${ id }.${ version }` );
+		}
 	}
 
 	// start listening for the responses
