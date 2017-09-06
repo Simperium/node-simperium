@@ -445,6 +445,11 @@ Channel.prototype.onChangeVersion = function( data ) {
 };
 
 Channel.prototype.onVersion = function( data ) {
+	// invalid version, give up without emitting
+	if ( data.slice( -2 ) === '\n?' ) {
+		return;
+	}
+
 	var ghost = parseVersionMessage( data );
 
 	this.emit( 'version', ghost.id, ghost.version, ghost.data );
@@ -642,45 +647,120 @@ LocalQueue.prototype.resendSentChanges = function() {
 	}
 }
 
+/**
+ * Attempts to fetch an entity's revisions
+ *
+ * By default, a bucket stores two kinds of history:
+ * 	- revisions: the most-recent changes to an entity (60 of these)
+ * 	- archive: a "snapshot" of every ten revisions (100 of these)
+ *
+ * Together the revisions and archive span changes over the
+ * 1,060 most-recent changes to an entity, but of course once
+ * we hit the archive we lose save granularity.
+ *
+ * Individual buckets can override the defaults as well and also
+ * completely eliminate them.
+ *
+ * We don't have a listing of which revisions exist for a given entity.
+ *
+ * @param {Object} channel used to send messages to the Simperium server
+ * @param {String} id entity id for which to fetch revisions
+ * @param {Function} callback called on error or when finished
+ */
 function collectionRevisions( channel, id, callback ) {
-	let expectedVersions;
-	let timeout;
-	const TIMEOUT = 10000; // arbitrarily chosen delay
+	/** @type {Number} ms delay arbitrarily chosen to give up on fetch */
+	const TIMEOUT = 200;
 
+	/** @type {Set} tracks requested revisions */
+	const requestedVersions = new Set();
+
+	/** @type {Array<Object>} contains the revisions and associated data */
 	const versions = [];
 
-	const finish = listener => {
-		channel.removeListener( 'version.' + id, listener );
-		callback( null, versions.sort( ( a, b ) => a.version - b.version ) );
-		clearTimeout( timeout );
-	};
+	/** @type {Number} remembers newest version of an entity */
+	let latestVersion;
 
-	const onVersion = ( id, version, data ) => {
+	/** @type {Number} handle for "start finishing" timeout */
+	let timeout;
+
+	/**
+	 * Receive a version update from the server and
+	 * dispatch the next fetch or finish the fetching
+	 *
+	 * @param {String} id entity id
+	 * @param {Number} version version of returned entity
+	 * @param {Object} data value of entity at revision
+	 */
+	function onVersion( id, version, data ) {
 		versions.push( { id, version, data } );
 
-		// Check if all versions have been collected
-		if ( expectedVersions === versions.length ) {
-			finish( onVersion );
+		// if we have every possible revision already, finish it!
+		// this bypasses any mandatory delay
+		if ( versions.length === latestVersion ) {
+			return finish();
 		}
-	};
 
-	channel.on( 'version.' + id, onVersion );
+		fetchNextVersion( version );
 
-	channel.store.get( id ).then( ghost => {
-		// the default bucket options allow for storing
-		// the 60 most-recent revisions of a note plus
-		// 100 archive versions (these store one out of
-		// every ten versions). we'll get up to this many
-		const version = Math.min( ghost.version, 160 );
-		expectedVersions = version;
+		// defer the final response to the application
+		clearTimeout( timeout );
+		timeout = setTimeout( finish, TIMEOUT );
+	}
 
-		// Loop through requested revision count and request each version
-		for ( let i = 0; i < version; i++ ) {
-			channel.send( 'e:' + id + '.' + ( ghost.version - i ) );
+	/**
+	 * Stop listening for versions and stop fetching them
+	 * and pass accumulated data back to application
+	 */
+	function finish() {
+		clearTimeout( timeout );
+		channel.removeListener( `version.${ id }`, onVersion );
+
+		// sort newest first
+		callback( null, versions.sort( ( a, b ) => b.version - a.version ) );
+	}
+
+	/**
+	 * Find the next version which isn't around and issue
+	 * a fetch if possible
+	 *
+	 * @param {Number} prevVersion starting point for finding next version
+	 */
+	function fetchNextVersion( prevVersion ) {
+		let version = prevVersion - 1;
+
+		// find the next version to request
+		// some could have come back already
+		// or been requested already
+		while ( version > 0 && requestedVersions.has( version ) ) {
+			version -= 1;
+		}
+
+		channel.send( `e:${ id }.${ version }` );
+		requestedVersions.add( version );
+	}
+
+	// start listening for the responses
+	channel.on( `version.${ id }`, onVersion );
+
+	// request the first revision and start the sequence
+	// pre-emptively fetch as many as could exist by default
+	channel.store.get( id ).then( ( { version } ) => {
+		latestVersion = version;
+
+		// grab latest change revisions
+		for ( let i = 0; i < 60 && ( version - i ) > 0; i++ ) {
+			fetchNextVersion( version - i );
+		}
+
+		// grab archive revisions
+		// these are like 1, 11, 21, 31, …, 41, normal revisions [42, 43, 44, 45, …]
+		const firstArchive = Math.round( ( version - 60 ) / 10 ) * 10 + 1; // 127 -> 67 -> 6 -> 60 -> 61
+		for ( let i = 0; i < 100 && ( firstArchive - 10 * i ) > 0; i++ ) {
+			fetchNextVersion( firstArchive - 10 * i );
 		}
 	}, callback );
 
-	// give up after a timeout
-	timeout = setTimeout( () => finish( onVersion ), TIMEOUT );
+	// and set an initial timeout for failed connections
+	timeout = setTimeout( finish, TIMEOUT * 4 );
 }
 
