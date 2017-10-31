@@ -399,6 +399,11 @@ Channel.prototype.onIndex = function( data ) {
 		cv			= page.current,
 		update	= internal.updateObjectVersion.bind( this );
 
+	if ( !mark ) {
+		// Let the bucket know straight away that indexing has finished
+		this.bucket.isIndexing = false;
+	}
+
 	var objectId;
 	objects.forEach( function( object ) {
 		objectId = object.id;
@@ -674,4 +679,3 @@ function collectionRevisions( channel, id, callback ) {
 		callback( e );
 	} );
 }
-
