@@ -399,6 +399,11 @@ Channel.prototype.onIndex = function( data ) {
 		cv			= page.current,
 		update	= internal.updateObjectVersion.bind( this );
 
+	if ( !mark ) {
+		// Let the bucket know straight away that indexing has finished
+		this.bucket.isIndexing = false;
+	}
+
 	var objectId;
 	objects.forEach( function( object ) {
 		objectId = object.id;
@@ -785,4 +790,3 @@ function collectionRevisions( channel, id, callback ) {
 	// and set an initial timeout for failed connections
 	timeout = setTimeout( finish, TIMEOUT * 4 );
 }
-
