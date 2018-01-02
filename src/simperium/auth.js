@@ -20,7 +20,7 @@ Auth.prototype.authorize = function( username, password ) {
 	return promise;
 }
 
-Auth.prototype.create = function ( username, password, provider ) {
+Auth.prototype.create = function( username, password, provider ) {
 	var userData = { username, password };
 	if ( provider ) {
 		userData.provider = provider;
