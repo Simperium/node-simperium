@@ -20,9 +20,13 @@ Auth.prototype.authorize = function( username, password ) {
 	return promise;
 }
 
-Auth.prototype.create = function( username, password ) {
-	var body = JSON.stringify( { username: username, password: password } ),
-		promise = this.request( 'create/', body );
+Auth.prototype.create = function ( username, password, provider ) {
+	var userData = { username, password };
+	if ( provider ) {
+		userData.provider = provider;
+	}
+	var body = JSON.stringify( userData ),
+	    promise = this.request( 'create/', body );
 
 	return promise;
 }
