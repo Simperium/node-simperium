@@ -293,6 +293,20 @@ export default function Channel( appid, access_token, bucket, store ) {
 		collectionRevisions( channel, id, callback );
 	};
 
+	bucket.getVersion = function( id, callback ) {
+		store.get( id ).then(
+			( ghost ) => {
+				var version = 0;
+				if ( ghost && ghost.version ) {
+					version = ghost.version;
+				}
+				callback( null, version );
+			},
+			// callback with error if promise fails
+			callback
+		);
+	};
+
 	bucketEvents
 		.on( 'update', internal.diffAndSend.bind( this ) )
 		.on( 'remove', internal.removeAndSend.bind( this ) );
