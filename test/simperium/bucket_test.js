@@ -56,5 +56,15 @@ describe( 'Bucket', function() {
 			done();
 		} );
 	} );
+
+	it( 'should fetch object version', () => {
+		store.objects = {
+			thing: { other: 'thing' }
+		};
+		bucket.getVersion( 'thing', ( error, version ) => {
+			assert.equal( version, 0 );
+		} );
+	} );
+
 } );
 
