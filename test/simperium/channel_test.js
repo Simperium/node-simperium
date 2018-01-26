@@ -403,6 +403,31 @@ describe( 'Channel', function() {
 			// send a 405 error
 			channel.handleMessage( 'c:' + JSON.stringify( [{error: 405, id: 'thing', ccids: ['abc']}] ) );
 		} );
+
+		describe( 'with synced object', () => {
+			beforeEach( ( done ) => {
+				var data = { title: 'hola mundo' };
+
+				channel.on( 'acknowledge', function( id ) {
+					done();
+				} );
+
+				channel.on( 'send', function( msg ) {
+					acknowledge( channel, msg );
+				} );
+
+				bucket.update( 'mock-id', data );
+			} );
+
+			it( 'should get version', ( done ) => {
+				bucket.getVersion( 'mock-id', ( error, version ) => {
+					assert.equal( version, 1 );
+					done()
+				} );
+			} );
+
+		} );
+
 	} );
 
 	it( 'should request index when cv is unknown', done => {
@@ -513,7 +538,7 @@ function acknowledge( channel, msg, cv ) {
 			id: change.id,
 			o: change.o,
 			v: change.v,
-			ev: change.sv ? change.sv + 1 : 0,
+			ev: change.sv ? change.sv + 1 : 1,
 			ccids: [change.ccid],
 			cv: cv || uuid.v4()
 		};
