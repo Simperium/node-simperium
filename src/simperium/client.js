@@ -71,6 +71,10 @@ Client.prototype.bucket = function( name ) {
 
 	if ( this.open ) channel.onConnect();
 
+	bucket.hasLocalChanges = function() {
+		return channel.localQueue.hasChanges();
+	};
+
 	return bucket;
 };
 

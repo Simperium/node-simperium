@@ -310,6 +310,29 @@ describe( 'Channel', function() {
 			} );
 		} );
 
+		it( 'should have local changes on send', function( done ) {
+			channel.once( 'send', function() {
+				assert.equal( channel.localQueue.hasChanges(), true );
+				done();
+			} );
+
+			store.put( '123', 3, {title: 'hello world'} ).then( function() {
+				bucket.update( '123', {title: 'goodbye world!!'} );
+			} );
+		} );
+
+		it( 'should have no local changes after ack', function( done ) {
+			channel.on( 'acknowledge', function() {
+				assert.equal( channel.localQueue.hasChanges(), false );
+				done();
+			} );
+
+			store.put( '123', 3, {title: 'hello world'} ).then( function() {
+				bucket.update( '123', {title: 'goodbye world!!'} );
+				done();
+			} );
+		} );
+
 		// If receiving a remote change while there are unsent local modifications,
 		// local changes should be rebased onto the new ghost and re-sent
 		it( 'should resolve applying patch to modified object', function( done ) {
