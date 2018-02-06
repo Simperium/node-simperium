@@ -31,6 +31,10 @@ Bucket.prototype.update = function( id, data, options, callback ) {
 	return this.store.update( id, data, this.isIndexing, callback );
 };
 
+Bucket.prototype.hasLocalChanges = function( callback ) {
+	callback( false );
+};
+
 Bucket.prototype.getVersion = function( id, callback ) {
 	callback( null, 0 );
 };

@@ -312,24 +312,14 @@ describe( 'Channel', function() {
 
 		it( 'should have local changes on send', function( done ) {
 			channel.once( 'send', function() {
-				assert.equal( channel.localQueue.hasChanges(), true );
-				done();
+				bucket.hasLocalChanges( hasChanges => {
+					assert.equal( hasChanges, true );
+					done();
+				} );
 			} );
 
 			store.put( '123', 3, {title: 'hello world'} ).then( function() {
 				bucket.update( '123', {title: 'goodbye world!!'} );
-			} );
-		} );
-
-		it( 'should have no local changes after ack', function( done ) {
-			channel.on( 'acknowledge', function() {
-				assert.equal( channel.localQueue.hasChanges(), false );
-				done();
-			} );
-
-			store.put( '123', 3, {title: 'hello world'} ).then( function() {
-				bucket.update( '123', {title: 'goodbye world!!'} );
-				done();
 			} );
 		} );
 

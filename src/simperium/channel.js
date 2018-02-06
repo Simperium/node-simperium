@@ -293,6 +293,10 @@ export default function Channel( appid, access_token, bucket, store ) {
 		collectionRevisions( channel, id, callback );
 	};
 
+	bucket.hasLocalChanges = function( callback ) {
+		callback( channel.localQueue.hasChanges() );
+	};
+
 	bucket.getVersion = function( id, callback ) {
 		store.get( id ).then(
 			( ghost ) => {
