@@ -293,6 +293,10 @@ export default function Channel( appid, access_token, bucket, store ) {
 		collectionRevisions( channel, id, callback );
 	};
 
+	bucket.hasLocalChanges = function( callback ) {
+		callback( null, channel.localQueue.hasChanges() );
+	};
+
 	bucket.getVersion = function( id, callback ) {
 		store.get( id ).then(
 			( ghost ) => {
@@ -574,8 +578,11 @@ LocalQueue.prototype.queue = function( change ) {
 	if ( !this.ready ) return;
 
 	this.processQueue( change.id );
-}
-;
+};
+
+LocalQueue.prototype.hasChanges = function() {
+	return Object.keys(this.queues).length > 0;
+};
 
 LocalQueue.prototype.dequeueChangesFor = function( id ) {
 	var changes = [], sent = this.sent[id], queue = this.queues[id];
