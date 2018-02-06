@@ -312,7 +312,7 @@ describe( 'Channel', function() {
 
 		it( 'should have local changes on send', function( done ) {
 			channel.once( 'send', function() {
-				bucket.hasLocalChanges( hasChanges => {
+				bucket.hasLocalChanges( ( error, hasChanges ) => {
 					assert.equal( hasChanges, true );
 					done();
 				} );

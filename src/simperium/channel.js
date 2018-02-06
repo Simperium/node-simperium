@@ -294,7 +294,7 @@ export default function Channel( appid, access_token, bucket, store ) {
 	};
 
 	bucket.hasLocalChanges = function( callback ) {
-		callback( channel.localQueue.hasChanges() );
+		callback( null, channel.localQueue.hasChanges() );
 	};
 
 	bucket.getVersion = function( id, callback ) {

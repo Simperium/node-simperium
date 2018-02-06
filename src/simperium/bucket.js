@@ -32,7 +32,7 @@ Bucket.prototype.update = function( id, data, options, callback ) {
 };
 
 Bucket.prototype.hasLocalChanges = function( callback ) {
-	callback( false );
+	callback( null, false );
 };
 
 Bucket.prototype.getVersion = function( id, callback ) {
