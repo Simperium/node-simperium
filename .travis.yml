@@ -1,11 +1,9 @@
 language: node_js
 sudo: false
-before_install:
-  - npm install -g eslint@2.2 babel-eslint
 script:
-  - `npm bin`/eslint .
+  - npm run check
   - npm test
 node_js:
-  - "6.0"
-  - "7.0"
-  - "8.0"
+  - "6"
+  - "7"
+  - "8"

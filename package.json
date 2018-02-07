@@ -8,6 +8,7 @@
     "url": "git://github.com/Simperium/node-simperium.git"
   },
   "scripts": {
+    "check": "eslint .",
     "test": "mocha --require @babel/register test/**",
     "prepublish": "babel -q -d lib/ src/"
   },
