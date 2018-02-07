@@ -6,10 +6,6 @@
 		"mocha": true,
 		"node": true
 	},
-	"ecmaFeatures": {
-		"modules": true,
-		"experimentalObjectRestSpread": true
-	},
 	"rules": {
 		"brace-style": [ 1, "1tbs" ],
 		// REST API objects include underscores
