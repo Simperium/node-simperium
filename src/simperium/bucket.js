@@ -47,31 +47,52 @@ export default function Bucket( name, storeProvider, channel ) {
 	this.store = storeProvider( this );
 	this.storeAPI = promiseAPI( this.store );
 	this.isIndexing = false;
-	this.channel = channel;
 
-	channel
-		// forward the index and error events from the channel
-		.on( 'index', ( ... args ) => this.emit( 'index', ... args ) )
-		.on( 'error', ( ... args ) => this.emit( 'error', ... args ) )
-		// when the channel updates or removes data, the bucket should apply
-		// the same updates
-		.on( 'update', ( id, data ) => {
-			this.update( id, data, { sync: false } );
-		} )
-		.on( 'indexingStateChange', ( isIndexing ) => {
-			this.isIndexing = isIndexing;
-			if ( isIndexing ) {
-				this.emit( 'indexing' );
-			}
-		} )
-		.on( 'remove', ( id ) => {
-			// TODO, there needs te be a way to remove without telling the
-			// channel to do it
-			this.remove( id );
-		} );
+	/**
+	 * Listeners for channel events
+	 */
+	this.onChannelIndex = this.emit.bind( this, 'index' );
+	this.onChannelError = this.emit.bind( this, 'error' );
+	this.onChannelUpdate = ( id, data ) => {
+		this.update( id, data, { sync: false } );
+	};
+
+	this.onChannelIndexingStateChange = ( isIndexing ) => {
+		this.isIndexing = isIndexing;
+		if ( isIndexing ) {
+			this.emit( 'indexing' );
+		}
+	};
+
+	this.onChannelRemove = ( id ) => this.remove( id );
+
+	if ( channel ) {
+		this.setChannel( channel );
+	}
 }
 
 inherits( Bucket, EventEmitter );
+
+Bucket.prototype.setChannel = function( channel ) {
+	if ( this.channel ) {
+		this.channel
+			.removeListener( 'index', this.onChannelIndex )
+			.removeListener( 'error', this.onChannelError )
+			.removeListener( 'update', this.onChannelUpdate )
+			.removeListener( 'indexingStateChange', this.onChannelIndexingStateChange )
+			.removeListener( 'remove', this.onChannelRemove );
+	}
+	this.channel = channel;
+	channel
+		// forward the index and error events from the channel
+		.on( 'index', this.onChannelIndex )
+		.on( 'error', this.onChannelError )
+		// when the channel updates or removes data, the bucket should apply
+		// the same updates
+		.on( 'update', this.onChannelUpdate )
+		.on( 'indexingStateChange', this.onChannelIndexingStateChange )
+		.on( 'remove', this.onChannelRemove );
+};
 
 Bucket.prototype.reload = function() {
 	this.channel.reload();

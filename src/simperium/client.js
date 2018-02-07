@@ -54,9 +54,11 @@ inherits( Client, EventEmitter );
 Client.prototype.bucket = function( name ) {
 	var channelId = this.buckets.length,
 		bucket = new Bucket( name, this.options.objectStoreProvider ),
-		channel = new Channel( this.appId, this.accessToken, bucket, this.options.ghostStoreProvider( bucket ) ),
+		channel = new Channel( this.appId, this.accessToken, this.options.ghostStoreProvider( bucket ), name ),
 		send = this.sendChannelMessage.bind( this, channelId ),
 		receive = channel.handleMessage.bind( channel );
+
+	bucket.setChannel( channel );
 
 	this.buckets.push( bucket );
 
