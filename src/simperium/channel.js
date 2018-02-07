@@ -317,6 +317,10 @@ export default function Channel( appid, access_token, bucket, store ) {
 		}
 	};
 
+	bucket.hasLocalChanges = function( callback ) {
+		callback( null, channel.localQueue.hasChanges() );
+	};
+
 	bucketEvents
 		.on( 'update', internal.diffAndSend.bind( this ) )
 		.on( 'remove', internal.removeAndSend.bind( this ) );
@@ -581,8 +585,11 @@ LocalQueue.prototype.queue = function( change ) {
 	if ( !this.ready ) return;
 
 	this.processQueue( change.id );
-}
-;
+};
+
+LocalQueue.prototype.hasChanges = function() {
+	return Object.keys(this.queues).length > 0;
+};
 
 LocalQueue.prototype.dequeueChangesFor = function( id ) {
 	var changes = [], sent = this.sent[id], queue = this.queues[id];
