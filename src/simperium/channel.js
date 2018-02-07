@@ -3,7 +3,7 @@ import { format, inherits } from 'util'
 import { EventEmitter } from 'events'
 import { parseMessage, parseVersionMessage, change as change_util } from './util'
 import JSONDiff from './jsondiff'
-import uuid from 'node-uuid'
+import { v4 as uuid } from 'uuid'
 
 const jsondiff = new JSONDiff( {list_diff: false} );
 
@@ -101,7 +101,7 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 			this.localQueue.queue( change );
 		}
 
-		notify = this.emit.bind( this, 'update', id, update, original, patch, this.bucket.isIndexing );
+		notify = this.emit.bind( this, 'update', id, update, original, patch, this.isIndexing );
 	} else {
 		notify = internal.updateAcknowledged.bind( this, acknowledged );
 	}
@@ -219,24 +219,21 @@ internal.handleChangeError = function( err, change, acknowledged ) {
 
 internal.indexingComplete = function() {
 	// Indexing has finished
-	this.bucket.isIndexing = false;
+	this.setIsIndexing( false );
 	this.emit( 'index', this.index_cv );
 
 	this.index_last_id = null;
 	this.index_cv = null;
-	this.bucket.removeListener( 'update', this.bucketUpdateListener );
 	this.emit( 'ready' )
 }
 
-export default function Channel( appid, access_token, bucket, store ) {
-	var channel = this;
-	var message = this.message = new EventEmitter();
-	var bucketEvents = new EventEmitter(),
-		update = bucket.update,
-		remove = bucket.remove;
+export default function Channel( appid, access_token, store, name ) {
+	const channel = this;
+	const message = this.message = new EventEmitter();
 
+	this.name = name;
+	this.isIndexing = false;
 	this.appid = appid;
-	this.bucket = bucket;
 	this.store = store;
 	this.access_token = access_token;
 
@@ -259,84 +256,47 @@ export default function Channel( appid, access_token, bucket, store ) {
 		internal.updateChangeVersion.call( channel, cv ).then( function() {
 			channel.localQueue.start();
 		} );
-		bucket.emit( 'index' );
 	} );
 
-	// forward errors to bucket instance
-	this.on( 'error', bucket.emit.bind( bucket, 'error' ) )
-
-	bucket.update = function( id, object, options, callback ) {
-		if ( typeof options === 'function' ) {
-			callback = options;
-			options = { sync: true };
+	this.update = ( object, sync = true ) => {
+		this.onBucketUpdate( object.id );
+		if ( sync === true ) {
+			internal.diffAndSend.call( this, object.id, object.data );
 		}
+	};
 
-		if ( !!options === false ) {
-			options = { sync: true };
+	this.remove = ( id ) => {
+		internal.removeAndSend.call( this, id )
+	}
+
+	this.getRevisions = ( id ) => new Promise( ( resolve, reject ) => {
+		collectionRevisions( channel, id, ( error, revisions ) => {
+			if ( error ) {
+				reject( error );
+				return;
+			}
+			resolve( revisions );
+		} );
+	} );
+
+	this.hasLocalChanges = () => Promise.resolve( channel.localQueue.hasChanges() );
+
+	this.getVersion = ( id ) => store.get( id ).then( ( ghost ) => {
+		if ( ghost && ghost.version ) {
+			return ghost.version;
 		}
-
-		return update.call( bucket, id, object, options, function( err, object ) {
-			if ( !err ) bucket.emit( 'update', id, object.data );
-			if ( !err && options.sync !== false ) bucketEvents.emit( 'update', id, object.data );
-			if ( callback ) callback.apply( this, arguments );
-		} );
-	};
-
-	bucket.remove = function( id, callback ) {
-		return remove.call( bucket, id, function( err ) {
-			if ( !err ) bucketEvents.emit( 'remove', id );
-			if ( callback ) callback.apply( this, arguments );
-		} );
-	};
-
-	bucket.getRevisions = function( id, callback ) {
-		collectionRevisions( channel, id, callback );
-	};
-
-	bucket.hasLocalChanges = function( callback ) {
-		callback( null, channel.localQueue.hasChanges() );
-	};
-
-	bucket.getVersion = function( id, callback ) {
-		store.get( id ).then(
-			( ghost ) => {
-				var version = 0;
-				if ( ghost && ghost.version ) {
-					version = ghost.version;
-				}
-				callback( null, version );
-			},
-			// callback with error if promise fails
-			callback
-		);
-	};
-
-	bucketEvents
-		.on( 'update', internal.diffAndSend.bind( this ) )
-		.on( 'remove', internal.removeAndSend.bind( this ) );
-
-	// when the network sends in an update or remove, update the bucket data
-	this
-		.on( 'update', function( id, data ) {
-			var args = [].slice.call( arguments );
-			update.call( bucket, id, data, {sync: false}, function() {
-				bucket.emit.apply( bucket, ['update'].concat( args ) );
-			} );
-		} )
-		.on( 'remove', function( id ) {
-			remove.call( bucket, id, function() {
-				bucket.emit( 'remove', id );
-			} );
-		} );
-
-	bucket.on( 'reload', this.onReload.bind( this ) );
-	this.bucketUpdateListener = this.onBucketUpdate.bind( this );
-	bucket.on( 'update', this.bucketUpdateListener );
+		return 0;
+	} );
 
 	this.on( 'change-version', internal.updateChangeVersion.bind( this ) );
 }
 
 inherits( Channel, EventEmitter );
+
+Channel.prototype.setIsIndexing = function( isIndexing ) {
+	this.isIndexing = isIndexing;
+	this.emit( 'indexingStateChange', this.isIndexing );
+}
 
 Channel.prototype.handleMessage = function( data ) {
 	var message = parseMessage( data );
@@ -347,6 +307,10 @@ Channel.prototype.send = function( data ) {
 	this.emit( 'send', data );
 };
 
+Channel.prototype.reload = function() {
+	this.onReload();
+};
+
 Channel.prototype.onReload = function() {
 	var emit = this.emit.bind( this, 'update' );
 	this.store.eachGhost( function( ghost ) {
@@ -354,10 +318,13 @@ Channel.prototype.onReload = function() {
 	} );
 };
 
-Channel.prototype.onBucketUpdate = function( noteId ) {
+Channel.prototype.onBucketUpdate = function( id ) {
+	if ( ! this.isIndexing ) {
+		return;
+	}
 	if ( this.index_last_id == null || this.index_cv == null ) {
 		return;
-	} else if ( this.index_last_id === noteId ) {
+	} else if ( this.index_last_id === id ) {
 		internal.indexingComplete.call( this );
 	}
 };
@@ -391,14 +358,13 @@ Channel.prototype.onAuth = function( data ) {
 
 Channel.prototype.startIndexing = function() {
 	this.localQueue.pause();
-	this.bucket.isIndexing = true;
-	this.bucket.emit( 'indexing' );
+	this.setIsIndexing( true );
 	this.sendIndexRequest();
 };
 
 Channel.prototype.onConnect = function() {
 	var init = {
-		name: this.bucket.name,
+		name: this.name,
 		clientid: this.session_id,
 		api: '1.1',
 		token: this.access_token,
@@ -411,18 +377,13 @@ Channel.prototype.onConnect = function() {
 };
 
 Channel.prototype.onIndex = function( data ) {
-	var page = JSON.parse( data ),
+	const page = JSON.parse( data ),
 		objects = page.index,
 		mark		= page.mark,
 		cv			= page.current,
 		update	= internal.updateObjectVersion.bind( this );
 
-	if ( !mark ) {
-		// Let the bucket know straight away that indexing has finished
-		this.bucket.isIndexing = false;
-	}
-
-	var objectId;
+	let objectId;
 	objects.forEach( function( object ) {
 		objectId = object.id;
 		update( object.id, object.v, object.d );
@@ -473,7 +434,7 @@ Channel.prototype.onVersion = function( data ) {
 		return;
 	}
 
-	var ghost = parseVersionMessage( data );
+	const ghost = parseVersionMessage( data );
 
 	this.emit( 'version', ghost.id, ghost.version, ghost.data );
 	this.emit( 'version.' + ghost.id, ghost.id, ghost.version, ghost.data );
@@ -581,7 +542,7 @@ LocalQueue.prototype.queue = function( change ) {
 };
 
 LocalQueue.prototype.hasChanges = function() {
-	return Object.keys(this.queues).length > 0;
+	return Object.keys( this.queues ).length > 0;
 };
 
 LocalQueue.prototype.dequeueChangesFor = function( id ) {
@@ -734,7 +695,8 @@ function collectionRevisions( channel, id, callback ) {
 		// if we have every possible revision already, finish it!
 		// this bypasses any mandatory delay
 		if ( versions.length === latestVersion ) {
-			return finish();
+			finish();
+			return;
 		}
 
 		fetchNextVersion( version );
