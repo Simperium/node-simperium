@@ -3,8 +3,9 @@ sudo: false
 before_install:
   - npm install -g eslint@2.2 babel-eslint
 script:
-  - eslint .
+  - `npm bin`/eslint .
   - npm test
 node_js:
-  - "4.0"
-  - "5.0"
+  - "6.0"
+  - "7.0"
+  - "8.0"
