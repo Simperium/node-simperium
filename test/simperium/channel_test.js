@@ -2,11 +2,11 @@
 import Channel from '../../src/simperium/channel'
 import util from 'util'
 import { parseMessage } from '../../src/simperium/util'
-import assert, { equal, ok } from 'assert'
+import { equal, ok, deepEqual, fail } from 'assert'
 import * as fn from './fn'
 import jsondiff from '../../src/simperium/jsondiff'
 import defaultGhostStoreProvider from '../../src/simperium/ghost/default'
-import uuid from 'node-uuid'
+import { v4 as uuid } from 'uuid'
 import Bucket from '../../src/simperium/bucket'
 import mockBucketStore from './mock_bucket_store'
 
@@ -22,9 +22,9 @@ describe( 'Channel', function() {
 	var channel, bucket, store;
 
 	beforeEach( function() {
-		bucket = new Bucket( 'things', mockBucketStore );
 		store = defaultGhostStoreProvider( bucket );
-		channel = new Channel( 'mock-app-id', 'mock-token', bucket, store );
+		channel = new Channel( 'mock-app-id', 'mock-token', store, 'things' );
+		bucket = new Bucket( 'things', mockBucketStore, channel );
 	} );
 
 	it( 'should send init on connect', function( done ) {
@@ -32,13 +32,13 @@ describe( 'Channel', function() {
 			var message = parseMessage( data ),
 				payload = JSON.parse( message.data );
 
-			assert.ok( payload.name );
-			assert.equal( 'init', message.command );
-			assert.equal( 'mock-token', payload.token );
-			assert.equal( payload.api, '1.1' );
-			assert.equal( 'mock-app-id', payload.app_id );
-			assert.equal( 'node-simperium', payload.library );
-			assert.equal( payload.version, '0.0.1' );
+			ok( payload.name );
+			equal( 'init', message.command );
+			equal( 'mock-token', payload.token );
+			equal( payload.api, '1.1' );
+			equal( 'mock-app-id', payload.app_id );
+			equal( 'node-simperium', payload.library );
+			equal( payload.version, '0.0.1' );
 			done();
 		} );
 
@@ -50,20 +50,20 @@ describe( 'Channel', function() {
 			version = 1,
 			data		= { content: 'Lol' },
 			changes = [{ sv: version,
-									o: 'M',
-									id: id,
-									clientid: 'sjs-2013070502-a1fab97d463883d66bae',
-									v: diff( data, {content: 'hola mundo'} ),
-									ev: 106,
-									cv: '5262d90aba5fdc4ed7eb2bc7',
-									ccids: [ 'ebd2c21c8a91be24c078746d9e935a3a' ]
-								}];
+				o: 'M',
+				id: id,
+				clientid: 'sjs-2013070502-a1fab97d463883d66bae',
+				v: diff( data, {content: 'hola mundo'} ),
+				ev: 106,
+				cv: '5262d90aba5fdc4ed7eb2bc7',
+				ccids: [ 'ebd2c21c8a91be24c078746d9e935a3a' ]
+			}];
 
 		channel.once( 'update', function( id, data ) {
-			assert.equal( data.content, 'Lol' );
+			equal( data.content, 'Lol' );
 
 			channel.once( 'update', function( id, data ) {
-				assert.equal( data.content, 'hola mundo' );
+				equal( data.content, 'hola mundo' );
 				done();
 			} );
 		} );
@@ -81,7 +81,7 @@ describe( 'Channel', function() {
 			change2 = { o: 'M', ev: 2, sv: 1, cv: 'cv2', id: id, v: diff( version1, version2 )},
 			change3 = { o: 'M', ev: 3, sv: 2, cv: 'cv3', id: id, v: diff( version2, version3 )},
 			check = fn.counts( 2, function( id, data ) {
-				assert.equal( data.content, 'step 3' );
+				equal( data.content, 'step 3' );
 				done();
 			} );
 
@@ -102,9 +102,9 @@ describe( 'Channel', function() {
 					payload = JSON.parse( data.substring( marker + 1 ) ),
 					patch = payload.v;
 
-				assert.equal( command, 'c' );
-				assert.equal( patch.content.o, '+' );
-				assert.equal( patch.content.v, 'Hola mundo!' );
+				equal( command, 'c' );
+				equal( patch.content.o, '+' );
+				equal( patch.content.v, 'Hola mundo!' );
 				done();
 			} );
 
@@ -114,15 +114,15 @@ describe( 'Channel', function() {
 		it( 'should not send a change with an empty diff', function( done ) {
 			var data = { title: 'hello world'};
 			channel.store.put( 'thing', 1, {title: 'hello world'} )
-			.then( function() {
-				channel.localQueue.on( 'send', function() {
-					assert.fail( 'Channel should not send empty changes' );
+				.then( function() {
+					channel.localQueue.on( 'send', function() {
+						fail( 'Channel should not send empty changes' );
+					} );
+					channel.once( 'unmodified', function() {
+						done();
+					} );
+					bucket.update( 'thing', data );
 				} );
-				channel.once( 'unmodified', function() {
-					done();
-				} );
-				bucket.update( 'thing', data );
-			} );
 		} );
 
 		it( 'should queue a change when pending exists', function( done ) {
@@ -140,7 +140,7 @@ describe( 'Channel', function() {
 			} )
 
 			channel.localQueue.on( 'wait', function( id ) {
-				assert.equal( id, objectId );
+				equal( id, objectId );
 				done();
 			} );
 
@@ -152,7 +152,7 @@ describe( 'Channel', function() {
 			var data = { title: 'Auto acknowledge!' };
 
 			channel.on( 'acknowledge', function( id ) {
-				assert.equal( undefined, channel.localQueue.sent[id] );
+				equal( undefined, channel.localQueue.sent[id] );
 				done();
 			} );
 
@@ -192,8 +192,8 @@ describe( 'Channel', function() {
 				var message = parseMessage( msg ),
 					change = JSON.parse( message.data );
 
-				assert.equal( change.o, '-' );
-				assert.equal( change.id, '123' );
+				equal( change.o, '-' );
+				equal( change.id, '123' );
 
 				// acknowledge the change
 				acknowledge( channel, msg );
@@ -201,15 +201,15 @@ describe( 'Channel', function() {
 
 			channel.on( 'acknowledge', function() {
 				store.get( '123' ).then( function( ghost ) {
-					assert.ok( !ghost.version, 'store should have deleted ghost' );
-					assert.deepEqual( ghost.data, {} );
+					ok( !ghost.version, 'store should have deleted ghost' );
+					deepEqual( ghost.data, {} );
 					done();
 				} );
 			} );
 
 			store.put( '123', 3, {title: 'hello world'} ).then( function() {
 				store.get( '123' ).then( function( ghost ) {
-					assert.equal( ghost.version, 3 );
+					equal( ghost.version, 3 );
 					bucket.remove( '123' );
 				} );
 			} );
@@ -218,8 +218,8 @@ describe( 'Channel', function() {
 		it( 'should wait for changes before removing', function( done ) {
 			var validate = fn.counts( 1, function() {
 				var queue = channel.localQueue.queues['123'];
-				assert.equal( queue.length, 2 );
-				assert.equal( queue.slice( -1 )[0].o, '-' );
+				equal( queue.length, 2 );
+				equal( queue.slice( -1 )[0].o, '-' );
 				done();
 			} );
 
@@ -235,19 +235,20 @@ describe( 'Channel', function() {
 			} );
 		} );
 
-		it( 'should notify bucket after receiving a network change', function( done ) {
-			var id = 'object',
+		it( 'should notify bucket after receiving a network change', () => {
+			const id = 'object',
 				data = { content: 'step 1'},
 				change = { o: 'M', ev: 1, cv: 'cv1', id: id, v: diff( {}, data )};
 
-			bucket.on( 'update', function() {
-				bucket.get( 'object', function( err, object ) {
-					assert.equal( object.content, 'step 1' );
-					done();
+			return new Promise( ( resolve ) => {
+				bucket.on( 'update', () => {
+					bucket.get( 'object' ).then( ( object ) => {
+						equal( object.content, 'step 1' );
+						resolve();
+					} );
 				} );
+				channel.handleMessage( 'c:' + JSON.stringify( [change] ) );
 			} );
-
-			channel.handleMessage( 'c:' + JSON.stringify( [change] ) );
 		} );
 
 		it( 'should emit ready after receiving changes', ( done ) => {
@@ -255,14 +256,14 @@ describe( 'Channel', function() {
 			channel.handleMessage( 'c:[]' );
 		} )
 
-		it( 'should notify bucket after network deletion', function( done ) {
+		it( 'should notify bucket after network deletion', () => new Promise( ( resolve, reject ) => {
 			var key = 'deleteTest';
 
 			bucket.on( 'remove', function( id ) {
-				bucket.get( id, function( e, id, object ) {
-					assert.ok( !object );
-					done();
-				} );
+				bucket.get( id ).then( object => {
+					equal( object, undefined );
+					resolve();
+				}, reject );
 			} );
 
 			bucket.update( key, {title: 'hello world'}, function() {
@@ -270,7 +271,7 @@ describe( 'Channel', function() {
 					o: '-', ev: 1, cv: 'cv1', id: key
 				}] ) );
 			} );
-		} );
+		} ) );
 
 		it( 'should request revisions', function( done ) {
 			var key = 'thing',
@@ -279,8 +280,8 @@ describe( 'Channel', function() {
 					var msg = parseMessage( msg ),
 						versionMsg = msg.data.split( '.' );
 
-					assert.equal( 'e', msg.command );
-					assert.equal( key, versionMsg[0] );
+					equal( 'e', msg.command );
+					equal( key, versionMsg[0] );
 				},
 				requests = [];
 
@@ -305,7 +306,7 @@ describe( 'Channel', function() {
 
 			bucket.getRevisions( key, function( err, revisions ) {
 				if ( err ) return done( err );
-				assert.equal( 8, revisions.length );
+				equal( 8, revisions.length );
 				done();
 			} );
 		} );
@@ -313,7 +314,7 @@ describe( 'Channel', function() {
 		it( 'should have local changes on send', function( done ) {
 			channel.once( 'send', function() {
 				bucket.hasLocalChanges( ( error, hasChanges ) => {
-					assert.equal( hasChanges, true );
+					equal( hasChanges, true );
 					done();
 				} );
 			} );
@@ -325,9 +326,9 @@ describe( 'Channel', function() {
 
 		// If receiving a remote change while there are unsent local modifications,
 		// local changes should be rebased onto the new ghost and re-sent
-		it( 'should resolve applying patch to modified object', function( done ) {
+		it( 'should resolve applying patch to modified object', () => new Promise( ( resolve ) => {
 			// add an item to the index
-			var key = 'hello',
+			const key = 'hello',
 				current = { title: 'Hello world' },
 				remoteDiff = diff( current, { title: 'Hello kansas'} );
 
@@ -337,14 +338,12 @@ describe( 'Channel', function() {
 			// the local changes being rebased on top of changes coming from the
 			// network which should ultimately be "Goodbye kansas"
 			channel.on( 'update', function( key, data ) {
-				setImmediate( function() {
-					assert.equal( data.title, 'Goodbye kansas' );
-				} )
+				equal( data.title, 'Goodbye kansas' );
 			} );
 
 			channel.on( 'send', function() {
-				assert.equal( channel.localQueue.sent[key].v.title.v, '-5\t+Goodbye\t=7' );
-				done();
+				equal( channel.localQueue.sent[key].v.title.v, '-5\t+Goodbye\t=6' );
+				resolve();
 			} );
 
 			// We receive a remote change from "Hello world" to "Hello kansas"
@@ -354,16 +353,14 @@ describe( 'Channel', function() {
 
 			// We're changing "Hello world" to "Goodbye world"
 			bucket.update( key, {title: 'Goodbye world'} );
-		} );
+		} ) );
 
-		it( 'should emit errors on the bucket instance', function( done ) {
+		it( 'should emit errors on the bucket instance', ( done ) => {
 			const error = {error: 404, id: 'thing', ccids: ['abc']}
 			bucket.on( 'error', ( e ) => {
-				process.nextTick( () => {
-					equal( 404, e.code )
-					equal( `${ e.code } - Could not apply change to: ${error.id}`, e.message )
-					done()
-				} )
+				equal( 404, e.code )
+				equal( `${ e.code } - Could not apply change to: ${error.id}`, e.message )
+				done()
 			} )
 			channel.handleMessage( 'c:' + JSON.stringify( [ error ] ) );
 		} );
@@ -382,13 +379,13 @@ describe( 'Channel', function() {
 			channel.store.put( 'thing', 1, {} ).then( function() {
 				// change is acknowledged and cleared from the queue
 				channel.on( 'acknowledge', function() {
-					assert( !channel.localQueue.sent.thing );
+					ok( !channel.localQueue.sent.thing );
 					done();
 				} );
 
 				// listen for change to be sent
 				channel.localQueue.once( 'send', function() {
-					assert( channel.localQueue.sent.thing );
+					ok( channel.localQueue.sent.thing );
 					// send a 412 response
 					channel.handleMessage( 'c:' + JSON.stringify( [{error: 412, id: 'thing', ccids: ['abc']}] ) );
 				} );
@@ -409,7 +406,7 @@ describe( 'Channel', function() {
 
 			// ensure that a change with a `d` property is added to the queue
 			channel.localQueue.once( 'queued', function( id, change, queue ) {
-				assert.ok( queue[0].d );
+				ok( queue[0].d );
 				done();
 			} );
 
@@ -421,7 +418,7 @@ describe( 'Channel', function() {
 			beforeEach( ( done ) => {
 				var data = { title: 'hola mundo' };
 
-				channel.on( 'acknowledge', function( id ) {
+				channel.on( 'acknowledge', function() {
 					done();
 				} );
 
@@ -434,13 +431,11 @@ describe( 'Channel', function() {
 
 			it( 'should get version', ( done ) => {
 				bucket.getVersion( 'mock-id', ( error, version ) => {
-					assert.equal( version, 1 );
+					equal( version, 1 );
 					done()
 				} );
 			} );
-
 		} );
-
 	} );
 
 	it( 'should request index when cv is unknown', done => {
@@ -477,8 +472,8 @@ describe( 'Channel', function() {
 			channel.once( 'send', function( data ) {
 				var message = parseMessage( data );
 
-				assert.equal( 'i', message.command );
-				assert.equal( '1:::10', message.data );
+				equal( 'i', message.command );
+				equal( '1:::10', message.data );
 				done();
 			} );
 
@@ -491,8 +486,8 @@ describe( 'Channel', function() {
 			channel.once( 'send', function( data ) {
 				setImmediate( function() {
 					var message = parseMessage( data );
-					assert.equal( 'cv', message.command );
-					assert.equal( cv, message.data );
+					equal( 'cv', message.command );
+					equal( cv, message.data );
 					done();
 				} )
 			} );
@@ -505,15 +500,19 @@ describe( 'Channel', function() {
 		it( 'should emit index and ready event when index complete', () => new Promise( resolve => {
 			var page = 'i:{"index":[{"id":"objectid","v":1,"d":{"title":"Hello World"}}],"current":"cv"}';
 			let indexed = false
+
 			channel.on( 'index', function( cv ) {
-				assert.equal( 'cv', cv );
-				assert( !bucket.isIndexing );
+				equal( 'cv', cv );
+				ok( !bucket.isIndexing );
 				indexed = true
 			} );
+
 			channel.on( 'ready', () => {
 				ok( indexed )
 				resolve()
 			} )
+
+			channel.startIndexing();
 			channel.handleMessage( page );
 		} ) );
 
@@ -523,7 +522,7 @@ describe( 'Channel', function() {
 				channel.handleMessage( page );
 			} );
 			bucket.once( 'indexing', function() {
-				assert( bucket.isIndexing );
+				ok( bucket.isIndexing );
 				done();
 			} );
 			channel.handleMessage( 'auth:user@example.com' );
