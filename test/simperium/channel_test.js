@@ -111,15 +111,16 @@ describe( 'Channel', function() {
 			bucket.update( '12345', {content: 'Hola mundo!'} );
 		} );
 
-		it( 'should not send a change with an empty diff', function( done ) {
-			var data = { title: 'hello world'};
-			channel.store.put( 'thing', 1, {title: 'hello world'} )
-			.then( function() {
+		it( 'should not send a change with an empty diff', async function() {
+			const data = { title: 'hello world'};
+			await channel.store.put( 'thing', 1, {title: 'hello world'} );
+
+			await new Promise( ( resolve, reject ) => {
 				channel.localQueue.on( 'send', function() {
-					assert.fail( 'Channel should not send empty changes' );
+					reject( new Error( 'Channel should not send empty changes' ) );
 				} );
 				channel.once( 'unmodified', function() {
-					done();
+					resolve();
 				} );
 				bucket.update( 'thing', data );
 			} );
@@ -207,12 +208,12 @@ describe( 'Channel', function() {
 				} );
 			} );
 
-			store.put( '123', 3, {title: 'hello world'} ).then( function() {
-				store.get( '123' ).then( function( ghost ) {
+			store.put( '123', 3, {title: 'hello world'} )
+				.then( () => store.get( '123' ) )
+				.then( ghost => {
 					assert.equal( ghost.version, 3 );
 					bucket.remove( '123' );
 				} );
-			} );
 		} );
 
 		it( 'should wait for changes before removing', function( done ) {

@@ -29,8 +29,12 @@ internal.changeObject = function( id, change ) {
 	// pull out the object from the store and apply the change delta
 	var applyChange = internal.performChange.bind( this, change );
 
-	this.networkQueue.queueFor( id ).add( function( done ) {
-		return applyChange().then( done, done );
+	this.networkQueue.queueFor( id ).add( async ( done ) => {
+		try {
+			done( null, await applyChange() );
+		} catch ( error ) {
+			done( error );
+		}
 	} );
 };
 
@@ -61,19 +65,19 @@ internal.sendChange = function( data ) {
 	this.emit( 'send', format( 'c:%s', JSON.stringify( data ) ) );
 };
 
-internal.diffAndSend = function( id, object ) {
-	var modify = internal.buildModifyChange.bind( this, id, object );
-	return this.store.get( id ).then( modify );
+internal.diffAndSend = async function( id, object ) {
+	const modify = internal.buildModifyChange.bind( this, id, object );
+	modify( await this.store.get( id ) );
 };
 
-internal.removeAndSend = function( id, object ) {
+internal.removeAndSend = async function( id, object ) {
 	var remove = internal.buildRemoveChange.bind( this, id, object );
-	return this.store.get( id ).then( remove );
+	remove( await this.store.get( id ) );
 };
 
 // We've receive a full object from the network. Update the local instance and
 // notify of the new object version
-internal.updateObjectVersion = function( id, version, data, original, patch, acknowledged ) {
+internal.updateObjectVersion = async function( id, version, data, original, patch, acknowledged ) {
 	var notify,
 		changes,
 		change,
@@ -106,10 +110,10 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 		notify = internal.updateAcknowledged.bind( this, acknowledged );
 	}
 
-	return this.store.put( id, version, data ).then( notify );
+	notify( await this.store.put( id, version, data ) );
 };
 
-internal.removeObject = function( id, acknowledged ) {
+internal.removeObject = async function( id, acknowledged ) {
 	var notify;
 	if ( !acknowledged ) {
 		notify = this.emit.bind( this, 'remove', id );
@@ -117,7 +121,7 @@ internal.removeObject = function( id, acknowledged ) {
 		notify = internal.updateAcknowledged.bind( this, acknowledged );
 	}
 
-	return this.store.remove( id ).then( notify );
+	await notify( await this.store.remove( id ) );
 };
 
 internal.updateAcknowledged = function( change ) {
@@ -128,9 +132,8 @@ internal.updateAcknowledged = function( change ) {
 	}
 };
 
-internal.performChange = function( change ) {
-	var success = internal.applyChange.bind( this, change );
-	return this.store.get( change.id ).then( success );
+internal.performChange = async function( change ) {
+	internal.applyChange.call( this, change, await this.store.get( change.id ) );
 };
 
 internal.findAcknowledgedChange = function( change ) {
@@ -151,7 +154,7 @@ internal.requestObjectVersion = function( id, version ) {
 	} );
 };
 
-internal.applyChange = function( change, ghost ) {
+internal.applyChange = async function( change, ghost ) {
 	var acknowledged = internal.findAcknowledgedChange.bind( this )( change ),
 		error,
 		emit,
@@ -178,32 +181,33 @@ internal.applyChange = function( change, ghost ) {
 
 	if ( change.o === operation.MODIFY ) {
 		if ( ghost && ( ghost.version !== change.sv ) ) {
-			internal.requestObjectVersion.call( this, change.id, change.sv ).then( data => {
-				internal.applyChange.call( this, change, { version: change.sv, data } )
-			} );
+			const objectVersion = await internal.requestObjectVersion.call( this, change.id, change.sv );
+			internal.applyChange.call( this, change, { version: change.sv, data: objectVersion } );
 			return;
 		}
 
 		original = ghost.data;
 		patch = change.v;
 		modified = jsondiff.apply_object_diff( original, patch );
-		return internal.updateObjectVersion.bind( this )( change.id, change.ev, modified, original, patch, acknowledged )
-			.then( emit );
+		const changeVersion = await internal.updateObjectVersion.call( this, change.id, change.ev, modified, original, patch, acknowledged );
+		emit( changeVersion );
+		return;
 	} else if ( change.o === operation.REMOVE ) {
-		return internal.removeObject.bind( this )( change.id, acknowledged ).then( emit );
+		emit(
+			await internal.removeObject.call( this, change.id, acknowledged )
+		);
 	}
 }
 
-internal.handleChangeError = function( err, change, acknowledged ) {
+internal.handleChangeError = async function( err, change, acknowledged ) {
 	switch ( err.code ) {
 		case CODE_INVALID_VERSION:
 		case CODE_INVALID_DIFF: // Invalid version or diff, send full object back to server
 			if ( ! change.hasSentFullObject ) {
-				this.store.get( change.id ).then( object => {
-					change.d = object;
-					change.hasSentFullObject = true;
-					this.localQueue.queue( change );
-				} );
+				const object = await this.store.get( change.id );
+				change.d = object;
+				change.hasSentFullObject = true;
+				this.localQueue.queue( change );
 			} else {
 				this.localQueue.dequeueChangesFor( change.id );
 			}
@@ -255,10 +259,9 @@ export default function Channel( appid, access_token, bucket, store ) {
 	this.localQueue.on( 'send', internal.sendChange.bind( this ) );
 	this.localQueue.on( 'error', internal.handleChangeError.bind( this ) );
 
-	this.on( 'index', function( cv ) {
-		internal.updateChangeVersion.call( channel, cv ).then( function() {
-			channel.localQueue.start();
-		} );
+	this.on( 'index', async function( cv ) {
+		await internal.updateChangeVersion.call( channel, cv );
+		channel.localQueue.start();
 		bucket.emit( 'index' );
 	} );
 
@@ -289,22 +292,29 @@ export default function Channel( appid, access_token, bucket, store ) {
 		} );
 	};
 
-	bucket.getRevisions = function( id, callback ) {
-		collectionRevisions( channel, id, callback );
+	bucket.getRevisions = async function( id, callback ) {
+		try {
+			const revisions = await collectionRevisions( channel, id );
+			callback( null, revisions );
+			return revisions;
+		} catch ( error ) {
+			callback( error );
+		}
 	};
 
-	bucket.getVersion = function( id, callback ) {
-		store.get( id ).then(
-			( ghost ) => {
-				var version = 0;
-				if ( ghost && ghost.version ) {
-					version = ghost.version;
-				}
-				callback( null, version );
-			},
-			// callback with error if promise fails
-			callback
-		);
+	bucket.getVersion = async function( id, callback ) {
+		try {
+			const ghost = await store.get( id );
+			let version = 0;
+			if ( ghost && ghost.version ) {
+				version = ghost.version;
+			}
+			callback( null, version );
+			return version;
+		} catch ( error ) {
+			callback( error );
+			throw error;
+		}
 	};
 
 	bucketEvents
@@ -358,13 +368,12 @@ Channel.prototype.onBucketUpdate = function( noteId ) {
 	}
 };
 
-Channel.prototype.onAuth = function( data ) {
+Channel.prototype.onAuth = async function( data ) {
 	var auth;
 	var init;
 	try {
 		auth = JSON.parse( data );
 		this.emit( 'unauthorized', auth );
-		return;
 	} catch ( error ) {
 		// request cv and then send method
 		this.once( 'ready', () => {
@@ -379,9 +388,7 @@ Channel.prototype.onAuth = function( data ) {
 			}
 		};
 
-		this.store.getChangeVersion().then( init );
-
-		return;
+		init( await this.store.getChangeVersion() );
 	}
 };
 
@@ -418,7 +425,7 @@ Channel.prototype.onIndex = function( data ) {
 		this.bucket.isIndexing = false;
 	}
 
-	var objectId;
+	let objectId;
 	objects.forEach( function( object ) {
 		objectId = object.id;
 		update( object.id, object.v, object.d );
@@ -456,10 +463,10 @@ Channel.prototype.onChanges = function( data ) {
 	this.emit( 'ready' );
 };
 
-Channel.prototype.onChangeVersion = function( data ) {
+Channel.prototype.onChangeVersion = async function( data ) {
 	if ( data === UNKNOWN_CV ) {
-		this.store.setChangeVersion( null )
-			.then( () => this.startIndexing() );
+		await this.store.setChangeVersion( null );
+		this.startIndexing();
 	}
 };
 
@@ -469,7 +476,7 @@ Channel.prototype.onVersion = function( data ) {
 		return;
 	}
 
-	var ghost = parseVersionMessage( data );
+	const ghost = parseVersionMessage( data );
 
 	this.emit( 'version', ghost.id, ghost.version, ghost.data );
 	this.emit( 'version.' + ghost.id, ghost.id, ghost.version, ghost.data );
@@ -593,9 +600,8 @@ LocalQueue.prototype.dequeueChangesFor = function( id ) {
 	return changes;
 };
 
-LocalQueue.prototype.processQueue = function( id ) {
+LocalQueue.prototype.processQueue = async function( id ) {
 	var queue = this.queues[id];
-	var compressAndSend = this.compressAndSend.bind( this, id );
 
 	// there is no queue, don't do anything
 	if ( !queue ) return;
@@ -612,7 +618,8 @@ LocalQueue.prototype.processQueue = function( id ) {
 		return;
 	}
 
-	this.store.get( id ).then( compressAndSend );
+	const ghost = await this.store.get( id );
+	this.compressAndSend.call( this, id, ghost );
 }
 
 LocalQueue.prototype.compressAndSend = function( id, ghost ) {
@@ -694,113 +701,120 @@ export const revisionCache = new Map();
  *
  * @param {Object} channel used to send messages to the Simperium server
  * @param {String} id entity id for which to fetch revisions
- * @param {Function} callback called on error or when finished
+ * @returns {Promise<Array>} list of versions received from the server
  */
-function collectionRevisions( channel, id, callback ) {
-	/** @type {Number} ms delay arbitrarily chosen to give up on fetch */
-	const TIMEOUT = 200;
+async function collectionRevisions( channel, id ) {
+	return new Promise( async ( resolve, reject ) => {
+		/** @type {Number} ms delay arbitrarily chosen to give up on fetch */
+		const TIMEOUT = 200;
 
-	/** @type {Set} tracks requested revisions */
-	const requestedVersions = new Set();
+		/** @type {Set} tracks requested revisions */
+		const requestedVersions = new Set();
 
-	/** @type {Array<Object>} contains the revisions and associated data */
-	const versions = [];
+		/** @type {Array<Object>} contains the revisions and associated data */
+		const versions = [];
 
-	/** @type {Number} remembers newest version of an entity */
-	let latestVersion;
+		/** @type {Number} remembers newest version of an entity */
+		let latestVersion;
 
-	/** @type {Number} handle for "start finishing" timeout */
-	let timeout;
+		/** @type {Number} handle for "start finishing" timeout */
+		let timeout;
 
-	/**
-	 * Receive a version update from the server and
-	 * dispatch the next fetch or finish the fetching
-	 *
-	 * @param {String} id entity id
-	 * @param {Number} version version of returned entity
-	 * @param {Object} data value of entity at revision
-	 */
-	function onVersion( id, version, data ) {
-		revisionCache.set( `${ id }.${ version }`, data );
-		versions.push( { id, version, data } );
+		/**
+		 * Receive a version update from the server and
+		 * dispatch the next fetch or finish the fetching
+		 *
+		 * @param {String} id entity id
+		 * @param {Number} version version of returned entity
+		 * @param {Object} data value of entity at revision
+		 */
+		function onVersion( id, version, data ) {
+			revisionCache.set( `${ id }.${ version }`, data );
+			versions.push( { id, version, data } );
 
-		// if we have every possible revision already, finish it!
-		// this bypasses any mandatory delay
-		if ( versions.length === latestVersion ) {
-			return finish();
+			// if we have every possible revision already, finish it!
+			// this bypasses any mandatory delay
+			if ( versions.length === latestVersion ) {
+				finish();
+				return;
+			}
+
+			fetchNextVersion( version );
+
+			// defer the final response to the application
+			clearTimeout( timeout );
+			timeout = setTimeout( finish, TIMEOUT );
 		}
 
-		fetchNextVersion( version );
+		/**
+		 * Stop listening for versions and stop fetching them
+		 * and pass accumulated data back to application
+		 */
+		function finish() {
+			clearTimeout( timeout );
+			channel.removeListener( `version.${ id }`, onVersion );
 
-		// defer the final response to the application
-		clearTimeout( timeout );
-		timeout = setTimeout( finish, TIMEOUT );
-	}
-
-	/**
-	 * Stop listening for versions and stop fetching them
-	 * and pass accumulated data back to application
-	 */
-	function finish() {
-		clearTimeout( timeout );
-		channel.removeListener( `version.${ id }`, onVersion );
-
-		// sort newest first
-		callback( null, versions.sort( ( a, b ) => b.version - a.version ) );
-	}
-
-	/**
-	 * Find the next version which isn't around and issue
-	 * a fetch if possible
-	 *
-	 * @param {Number} prevVersion starting point for finding next version
-	 */
-	function fetchNextVersion( prevVersion ) {
-		let version = prevVersion;
-
-		// find the next version to request
-		// some could have come back already
-		// or been requested already
-		while ( version > 0 && requestedVersions.has( version ) ) {
-			version -= 1;
+			// sort newest first
+			const result = versions.sort( ( a, b ) => b.version - a.version );
+			resolve( result );
 		}
 
-		// we have them all
-		if ( ! version ) {
-			return;
+		/**
+		 * Find the next version which isn't around and issue
+		 * a fetch if possible
+		 *
+		 * @param {Number} prevVersion starting point for finding next version
+		 */
+		function fetchNextVersion ( prevVersion ) {
+			let version = prevVersion;
+
+			// find the next version to request
+			// some could have come back already
+			// or been requested already
+			while ( version > 0 && requestedVersions.has( version ) ) {
+				version -= 1;
+			}
+
+			// we have them all
+			if ( ! version ) {
+				return;
+			}
+
+			requestedVersions.add( version );
+
+			// fetch from server or local cache
+			if ( revisionCache.has( `${ id }.${ version }` ) ) {
+				onVersion( id, version, revisionCache.get( `${ id }.${ version }` ) );
+			} else {
+				channel.send( `e:${ id }.${ version }` );
+			}
 		}
 
-		requestedVersions.add( version );
+		// start listening for the responses
+		channel.on( `version.${ id }`, onVersion );
 
-		// fetch from server or local cache
-		if ( revisionCache.has( `${ id }.${ version }` ) ) {
-			onVersion( id, version, revisionCache.get( `${ id }.${ version }` ) );
-		} else {
-			channel.send( `e:${ id }.${ version }` );
+		// request the first revision and start the sequence
+		// pre-emptively fetch as many as could exist by default
+		try {
+			const { version } = await channel.store.get( id );
+			latestVersion = version;
+
+			// grab latest change revisions
+			for ( let i = 0; i < 60 && ( version - i ) > 0; i++ ) {
+				fetchNextVersion( version - i );
+			}
+
+			// grab archive revisions
+			// these are like 1, 11, 21, 31, …, 41, normal revisions [42, 43, 44, 45, …]
+			const firstArchive = Math.round( ( version - 60 ) / 10 ) * 10 + 1; // 127 -> 67 -> 6 -> 60 -> 61
+			for ( let i = 0; i < 100 && ( firstArchive - 10 * i ) > 0; i++ ) {
+				fetchNextVersion( firstArchive - 10 * i );
+			}
+		} catch ( error ) {
+			reject( error );
 		}
-	}
 
-	// start listening for the responses
-	channel.on( `version.${ id }`, onVersion );
-
-	// request the first revision and start the sequence
-	// pre-emptively fetch as many as could exist by default
-	channel.store.get( id ).then( ( { version } ) => {
-		latestVersion = version;
-
-		// grab latest change revisions
-		for ( let i = 0; i < 60 && ( version - i ) > 0; i++ ) {
-			fetchNextVersion( version - i );
-		}
-
-		// grab archive revisions
-		// these are like 1, 11, 21, 31, …, 41, normal revisions [42, 43, 44, 45, …]
-		const firstArchive = Math.round( ( version - 60 ) / 10 ) * 10 + 1; // 127 -> 67 -> 6 -> 60 -> 61
-		for ( let i = 0; i < 100 && ( firstArchive - 10 * i ) > 0; i++ ) {
-			fetchNextVersion( firstArchive - 10 * i );
-		}
-	}, callback );
-
-	// and set an initial timeout for failed connections
-	timeout = setTimeout( finish, TIMEOUT * 4 );
+		// and set an initial timeout for failed connections
+		timeout = setTimeout( finish, TIMEOUT * 4 );
+	} );
 }

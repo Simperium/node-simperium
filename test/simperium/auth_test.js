@@ -1,6 +1,6 @@
 import Auth from '../../src/simperium/auth'
 import https from 'https'
-import { equal, deepEqual } from 'assert'
+import { equal, deepEqual, fail, throws } from 'assert'
 import { EventEmitter } from 'events'
 
 const stub = ( respond ) => {
@@ -18,6 +18,19 @@ const stubResponse = ( data ) => stub( ( body, handler ) => {
 	response.emit( 'end' )
 } )
 
+const assertThrows = async ( promise, matchesMessage = undefined ) => {
+	let result = null;
+	try {
+		result = await promise;
+	} catch ( error ) {
+		throws( () => {
+			throw error
+		}, matchesMessage );
+		return;
+	}
+	fail( null, result, 'error not thrown' );
+}
+
 describe( 'Auth', () => {
 	var auth
 
@@ -33,7 +46,7 @@ describe( 'Auth', () => {
 		deepEqual( headers, { 'X-Simperium-API-Key': 'secret' } )
 	} )
 
-	it( 'should request auth token', ( done ) => {
+	it( 'should request auth token', async () => {
 		stub( ( data, handler ) => {
 			const { username, password } = JSON.parse( data )
 			const response = new EventEmitter()
@@ -45,24 +58,20 @@ describe( 'Auth', () => {
 			response.emit( 'end' );
 		} )
 
-		auth.authorize( 'username', 'password' )
-		.then( ( user ) => {
-			equal( user.access_token, 'secret-token' )
-			done()
-		} )
+		const user = await auth.authorize( 'username', 'password' );
+		equal( user.access_token, 'secret-token' );
 	} )
 
-	it( 'should fail to auth with invalid credentials', ( done ) => {
-		stubResponse( 'this is not json' )
+	it( 'should fail to auth with invalid credentials', async () => {
+		stubResponse( 'this is not json' );
 
-		auth.authorize( 'username', 'bad-password' )
-		.catch( ( e ) => {
-			equal( e.message, 'this is not json' )
-			done()
-		} )
+		await assertThrows(
+			auth.authorize( 'username', 'bad-password' ),
+			/this is not json/
+		);
 	} )
 
-	it( 'should create an account with valid credentials', ( done ) => {
+	it( 'should create an account with valid credentials', async () => {
 		stub( ( data, handler ) => {
 			const { username, password } = JSON.parse( data )
 			const response = new EventEmitter()
@@ -74,20 +83,16 @@ describe( 'Auth', () => {
 			response.emit( 'end' );
 		} )
 
-		auth.create( 'username', 'password' )
-		.then( ( user ) => {
-			equal( user.access_token, 'secret-token' )
-			done()
-		} )
+		const user = await auth.create( 'username', 'password' )
+		equal( user.access_token, 'secret-token' )
 	} )
 
-	it( 'should fail to create an account with invalid credentials', ( done ) => {
+	it( 'should fail to create an account with invalid credentials', async () => {
 		stubResponse( 'this is not json' )
 
-		auth.create( 'username', 'bad-password' )
-		.catch( ( e ) => {
-			equal( e.message, 'this is not json' )
-			done()
-		} )
+		await assertThrows(
+			auth.create( 'username', 'bad-password' ),
+			'this is not json'
+		);
 	} )
 } )
