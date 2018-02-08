@@ -3,20 +3,20 @@ import { inherits } from 'util'
 import { v4 as uuid } from 'uuid';
 
 /**
+ * @callback taskCallback
+ * @param {?Error} - if an error occurred it will be provided, otherwise null
+ * @param {Any} - the result of task
+ */
+
+/**
  * Convenience function to turn a function that uses a callback into a function
  * that returns a Promise.
  *
- * @param {Function} task - function that expects a single callback argument
+ * @param {taskCallback} task - function that expects a single callback argument
  * @returns {Promise} callback wrapped in a promise interface
  */
 const callbackAsPromise = ( task ) => new Promise( ( resolve, reject ) => {
-	task( ( error, result ) => {
-		if ( error ) {
-			reject( error );
-			return;
-		}
-		resolve( result );
-	} );
+	task( ( error, result ) => error ? reject( error ) : resolve( result ) );
 } );
 
 /**
@@ -45,22 +45,98 @@ const deprecateCallback = ( callback, promise ) => {
 };
 
 /**
+ * A bucket object represents the data stored in Simperium for the given id
+ *
+ * @typedef {Object} BucketObject
+ * @param {String} id - bucket object id
+ * @param {Object} data - object literal of bucket object data stored at the id
+ * @param {?Boolean} isIndexing - used to indicate that the bucket is being indexed
+ */
+
+/**
+ * @callback bucketStoreGetCallback
+ * @param {?Error}
+ * @param {?BucketObject}
+ */
+
+/**
+ * @callback bucketStoreRemoveCallback
+ * @param {?Error}
+ */
+
+/**
+ * @callback bucketStoreFindCallback
+ * @param {?Error}
+ * @param {?BucketObject[]}
+ */
+
+/**
+ * Used by a bucket to store bucket object data.
+ *
+ * @interface BucketStore
+ */
+
+/**
+ * Retrieve a bucket object from the store
+ * @function
+ * @name BucketStore#get
+ * @param {String} id - the bucket object id to fetch
+ * @param {bucketStoreGetCallback} - callback once the object is fetched
+ */
+
+/**
+ * Updates the data for the given object id.
+ *
+ * @function
+ * @name BucketStore#update
+ * @param {String} id - to of object to update
+ * @param {Object} data - data to update the object to
+ * @param {Boolean} isIndexing - indicates the object is being downloaded during an index
+ * @param {bucketStoreGetCallback}
+ */
+
+/**
+ * Deletes the object at id from the datastore.
+ *
+ * @function
+ * @name BucketStore#remove
+ * @param {String} id - object to delete from the bucket
+ * @param {bucketStoreRemoveCallback} - called once the object is deleted
+ */
+
+/**
+ * Fetchs all bucket objects from the datastore.
+ *
+ * @function
+ * @name BucketStore#find
+ * @param {?Object} query - currently undefined
+ * @param {bucketStoreFindCallback} - called with results
+ */
+
+/**
  * Turns existing bucket storage provider callback api into a promise based API
  *
- * @param {Object} store - a bucket storage object
+ * @param {BucketStore} store - a bucket storage object
  * @returns {Object} store api methods that use Promises instead of callbacks
  */
 const promiseAPI = store => ( {
-	get: ( id ) =>
+	get: id =>
 		callbackAsPromise( store.get.bind( store, id ) ),
 	update: ( id, object, isIndexing ) =>
 		callbackAsPromise( store.update.bind( store, id, object, isIndexing ) ),
-	remove: ( id ) =>
+	remove: id =>
 		callbackAsPromise( store.remove.bind( store, id ) ),
-	find: ( query ) =>
+	find: query =>
 		callbackAsPromise( store.find.bind( store, query ) )
 } );
 
+/**
+ * A bucket that syncs data with Simperium.
+ *
+ * @param {String} name - Simperium bucket name
+ * @param {bucketStoreProvider} storeProvider - a factory function that provides a bucket store
+ * @param {Channel} channel - a channel instance used for syncing Simperium data
+ */
 export default function Bucket( name, storeProvider, channel ) {
 	EventEmitter.call( this );
 	this.name = name;
@@ -134,7 +210,7 @@ Bucket.prototype.reload = function() {
  * object ID to represent the object in simperium.
  *
  * @param {Object} object - plain js object literal to be saved/synced
- * @param {Function} callback - runs when object has been saved
+ * @param {?bucketStoreGetCallback} callback - runs when object has been saved
  * @return {Promise<Object>} data stored in the bucket
  */
 Bucket.prototype.add = function( object, callback ) {
@@ -146,7 +222,7 @@ Bucket.prototype.add = function( object, callback ) {
  * Requests the object data stored in the bucket for the given id.
  *
  * @param {String} id - bucket object id
- * @param {Function} callback - with the data stored in the bucket
+ * @param {?bucketStoreGetCallback} callback - with the data stored in the bucket
  * @return {Promise<Object>} the object id, data and indexing status
  */
 Bucket.prototype.get = function( id, callback ) {
@@ -160,7 +236,7 @@ Bucket.prototype.get = function( id, callback ) {
  * @param {Object} data - object literal to replace the object data with
  * @param {Object} [options] - optional settings
  * @param {Boolean} [options.sync=true] - false if object should not be synced with this update
- * @param {Function} callback - executed when object is updated localy
+ * @param {?bucketStoreGetCallback} callback - executed when object is updated localy
  * @returns {Promise<Object>} - update data
  */
 Bucket.prototype.update = function( id, data, options, callback ) {
@@ -183,9 +259,15 @@ Bucket.prototype.update = function( id, data, options, callback ) {
 };
 
 /**
+ * @callback bucketHasLocalChanges
+ * @param {?Error}
+ * @param {?Boolean}
+ */
+
+/**
  * Check if the bucket has pending changes that have not yet been synced.
  *
- * @param {Function} [callback] - optional callback to receive response
+ * @param {?bucketHasLocalChanges} callback - optional callback to receive response
  * @returns {Promise<Boolean>} resolves to true if their are still changes to sync
  */
 Bucket.prototype.hasLocalChanges = function( callback ) {
@@ -193,12 +275,18 @@ Bucket.prototype.hasLocalChanges = function( callback ) {
 };
 
 /**
+ * @callback bucketGetVersion
+ * @param {?Error}
+ * @param {Number}
+ */
+
+/**
  * Gets the currently synced version number for the specified object id.
  *
  * A version of `0` indicates that an object has not been added to simperium yet.
  *
  * @param {String} id - object to get the version for
- * @param {Function} [callback] - optional callback
+ * @param {?bucketGetVersionCallback} callback - optional callback
  * @returns {Promise<number>} - resolves to the current synced version
  */
 Bucket.prototype.getVersion = function( id, callback ) {
@@ -210,7 +298,7 @@ Bucket.prototype.getVersion = function( id, callback ) {
  * is locally stored for the object
  *
  * @param {String} id - object to sync
- * @param {Function} [callback] - optional callback
+ * @param {?bucketStoreGetCallback} callback - optional callback
  * @returns {Promise<Object>} - object id, data
  */
 Bucket.prototype.touch = function( id, callback ) {
@@ -224,7 +312,7 @@ Bucket.prototype.touch = function( id, callback ) {
  * Deletes the object from the bucket
  *
  * @param {String} id - object to delete
- * @param {Function} [callback] - optional callback
+ * @param {?bucketStoreRemoveCallback} callback - optional callback
  * @returns {Promise<Void>} - resolves when object has been deleted
  */
 Bucket.prototype.remove = function( id, callback ) {

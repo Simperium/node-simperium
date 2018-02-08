@@ -16,6 +16,32 @@ module.exports = Client;
 module.exports.Bucket = Bucket;
 module.exports.Channel = Channel;
 
+/**
+ * @function
+ * @name bucketStoreProvider
+ * @param {Bucket} - the bucket to create a store instance for
+ * @returns {BucketStore} - the bucket store instance to be used by the bucket
+ */
+
+/**
+ * @function
+ * @name ghostStoreProvider
+ * @param {Bucket} - the bucket to create a store instance for
+ * @returns {GhostStore} - the ghost store instance to be used by the bucket
+ */
+
+/**
+ * A Client is the main interface to Simperium.
+ *
+ * @param {String} appId - Simperium application id
+ * @param {String} accessToken - User access token
+ * @param {Object} options - configuration options for the client
+ * @param {ghostStoreProvider} [options.ghostStoreProvider=defaultGhostStoreProvider]
+ *            - factory function for creating ghost store instances
+ * @param {bucketStoreProvider} [options.objectStoreProvider=defaultObjectStoreProvider]
+ *            - factory function for creating object store instances
+ * @param {number} [heartbeatInterval=4] - heartbeat interval for maintaining connection status with Simperium.com
+ */
 function Client( appId, accessToken, options ) {
 	options = options || {};
 
@@ -51,6 +77,12 @@ function Client( appId, accessToken, options ) {
 
 inherits( Client, EventEmitter );
 
+/**
+ * Set up a bucket with the given name for interacting with Simperium.
+ *
+ * @param {String} name - the bucket name on simperium
+ * @returns {Bucket} a bucket instance configured for syncing
+ */
 Client.prototype.bucket = function( name ) {
 	var channelId = this.buckets.length,
 		bucket = new Bucket( name, this.options.objectStoreProvider ),

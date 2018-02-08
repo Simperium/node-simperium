@@ -1,3 +1,8 @@
+/**
+ * An in memory implementation of GhostStore
+ *
+ * @param {Bucket} bucket instance to save ghost data for
+ */
 export default function Store( bucket ) {
 	this.bucket = bucket;
 	this.index = {};

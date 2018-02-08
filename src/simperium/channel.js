@@ -28,6 +28,7 @@ const internal = {};
  */
 internal.updateChangeVersion = function( cv ) {
 	return this.store.setChangeVersion( cv ).then( () => {
+		// A unit test currently relies on this event, otherwise we can remove it
 		this.emit( 'change-version', cv );
 		return cv;
 	} );
@@ -92,7 +93,6 @@ internal.buildRemoveChange = function( id, ghost ) {
 	var payload = change_util.buildChange( change_util.type.REMOVE, id, {}, ghost );
 	this.localQueue.queue( payload );
 };
-
 
 internal.diffAndSend = function( id, object ) {
 	var modify = internal.buildModifyChange.bind( this, id, object );
@@ -266,21 +266,106 @@ internal.indexingComplete = function() {
 }
 
 /**
- * Maintains syncing state for a simperium bucket.
+ * A ghost represents a version of a bucket object as known by Simperium
  *
- * A bucket uses a channel to lister for updates that come from simperium while
+ * Generally a client will keep the last known ghost stored locally for efficient
+ * diffing and patching of Simperium change operations.
+ *
+ * @typedef {Object} Ghost
+ * @property {Number} version - the ghost's version
+ * @property {String} key - the simperium bucket object id this ghost is for
+ * @property {Object} data - the data for the given ghost version
+ */
+
+/**
+ * Callback function used by the ghost store to iterate over existing ghosts
+ *
+ * @callback ghostIterator
+ * @param {Ghost} - the current ghost
+ */
+
+/**
+ * A GhostStore provides the store mechanism for ghost data that the Channel
+ * uses to maintain syncing state and producing change operations for
+ * Bucket objects.
+ *
+ * @interface GhostStore
+ */
+
+/**
+ * Retrieve a Ghost for the given bucket object id
+ *
+ * @function
+ * @name GhostStore#get
+ * @param {String} id - bucket object id
+ * @returns {Promise<Ghost>} - the ghost for this object
+ */
+
+/**
+ * Save a ghost in the store.
+ *
+ * @function
+ * @name GhostStore#put
+ * @param {String} id - bucket object id
+ * @param {Number} version - version of ghost data
+ * @param {Object} data - object literal to save as this ghost's data for this version
+ * @returns {Promise<Ghost>} - the ghost for this object
+ */
+
+/**
+ * Delete a Ghost from the store.
+ *
+ * @function
+ * @name GhostStore#remove
+ * @param {String} id - bucket object id
+ * @returns {Promise<Ghost>} - the ghost for this object
+ */
+
+/**
+ * Iterate over existing Ghost objects with the given callback.
+ *
+ * @function
+ * @name GhostStore#eachGhost
+ * @param {ghostIterator} - function to run against each ghost
+ */
+
+/**
+ * Get the current change version (cv) that this channel has synced.
+ *
+ * @function
+ * @name GhostStore#getChangeVersion
+ * @returns {Promise<String>} - the current change version for the bucket
+ */
+
+/**
+ * Set the current change version.
+ *
+ * @function
+ * @name GhostStore#setChangeVersion
+ * @returns {Promise<Void>} - resolves once the change version is saved
+ */
+
+
+/**
+ * Maintains syncing state for a Simperium bucket.
+ *
+ * A bucket uses a channel to listen for updates that come from simperium while
  * sending updates that are made on the client.
  *
  * The channel can handle incoming simperium commands via `handleMessage`. These
- * messages are stripped of their channel number that seperates bucket operations.
+ * messages are stripped of their channel number that separates bucket operations.
  * The `Client` maintains which commands should be routed to which channel.
  *
  * The channel is responsible for creating all change operations and downloading
  * bucket data.
  *
+ * @param {String} appid - Simperium app id, used for authenticating
+ * @param {String} access_token - Simperium user access token
+ * @param {GhostStore} store - data storage for ghost objects
+ * @param {String} name - the name of the bucket on Simperium.com
  */
 export default function Channel( appid, access_token, store, name ) {
-	const channel = this;
+	// Uses an event emitter to handle different Simperium  commands
 	const message = this.message = new EventEmitter();
 
 	this.name = name;
@@ -289,7 +374,7 @@ export default function Channel( appid, access_token, store, name ) {
 	this.store = store;
 	this.access_token = access_token;
 
-	this.session_id = 'node-' + uuid.v4();
+	this.session_id = 'node-' + uuid();
 
 	// These are the simperium bucket commands the channel knows how to handle
 	message.on( 'auth', this.onAuth.bind( this ) );
@@ -316,26 +401,6 @@ export default function Channel( appid, access_token, store, name ) {
 	// Handle change errors caused by changes originating from this client
 	this.localQueue.on( 'error', internal.handleChangeError.bind( this ) );
 }
-
-/**
- * A ghost represents a version of a bucket object as known by Simperium
- *
- * Generally a client will keep the last known ghost stored locally for efficient
- * diffing and patching of Simperium change operations.
- *
- * @typedef {Object} Ghost
- * @property {Number} version - the ghost's version
- * @property {String} key - the simperium bucket object id this ghost is for
- * @property {Object} data - the data for the given ghost version
- */
-
-/**
- * An object stored is Simperium.
- *
- * @typedef {Object} BucketObject
- * @property {String} id - simperium bucket object id
- * @property {Object} data - object literal data to be stored at the id
- */
 
 inherits( Channel, EventEmitter );
 
@@ -459,9 +524,8 @@ Channel.prototype.send = function( data ) {
  * Restores a buckets data to what is currently stored in the ghost data.
  */
 Channel.prototype.reload = function() {
-	var emit = this.emit.bind( this, 'update' );
-	this.store.eachGhost( function( ghost ) {
-		emit( ghost.key, ghost.data );
+	this.store.eachGhost( ghost => {
+		this.emit( 'update', ghost.key, ghost.data );
 	} );
 };
 
