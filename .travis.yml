@@ -1,10 +1,23 @@
 language: node_js
 sudo: false
-before_install:
-  - npm install -g eslint@2.2 babel-eslint
 script:
-  - eslint .
-  - npm test
+- npm run lint
+- npm run test:coverage
 node_js:
-  - "4.0"
-  - "5.0"
+- '8.0'
+- '7.0'
+- '6.0'
+cache:
+  directories:
+  - node_modules
+deploy:
+  skip_cleanup: true
+  provider: npm
+  email: beaucollins@gmail.com
+  api_key:
+    secure: g/QwhJTatuD/JTID1EhT528c4w+fcig61G24TbuYOceWlmeyHhIwHUGoF47epg81vPcLj84ynGAkTYB8VX1Zvy5vBc/D/T8K2aB6XWI/xrUWjE1LCOFTYbUOtuiNv+e6q0ScTyOgkhlo090fKPIW8DKEec4lDx6O3CLFM6LI+xc=
+  on:
+    tags: true
+    tag: next
+    repo: Simperium/node-simperium
+    node: "8.0"
