@@ -2,7 +2,14 @@ import { EventEmitter } from 'events'
 import { inherits } from 'util'
 import { v4 as uuid } from 'uuid';
 
-const callbackAsPromise = ( callback, task ) => new Promise( ( resolve, reject ) => {
+/**
+ * Convenience function to turn a function that uses a callback into a function
+ * that returns a Promise.
+ *
+ * @param {Function} task - function that expects a single callback argument
+ * @returns {Promise} callback wrapped in a promise interface
+ */
+const callbackAsPromise = ( task ) => new Promise( ( resolve, reject ) => {
 	task( ( error, result ) => {
 		if ( error ) {
 			reject( error );
@@ -12,10 +19,17 @@ const callbackAsPromise = ( callback, task ) => new Promise( ( resolve, reject )
 	} );
 } );
 
+/**
+ * Runs a promise with a callback (if one is provided) to support the old callback API.
+ * NOTE: if the callback API is removed this is a place to warn users
+ *
+ * @param {Function} [callback] - if provided, will be called with the expected values
+ * @param {Promise} promise - promise to run, executes callback if provieded
+ * @returns {Promise} promise is passed through
+ */
 const deprecateCallback = ( callback, promise ) => {
 	if ( typeof callback === 'function' ) {
-		// TODO: warn about deprecating callback API
-		// and convert to promises
+		// Potentially could warn here if we decide to remove callback API
 		return promise.then(
 			result => {
 				callback( null, result );
@@ -30,15 +44,21 @@ const deprecateCallback = ( callback, promise ) => {
 	return promise;
 };
 
+/**
+ * Turns existing bucket storage provider callback api into a promise based API
+ *
+ * @param {Object} store - a bucket storage object
+ * @returns {Object} store api methods that use Promises instead of callbacks
+ */
 const promiseAPI = store => ( {
-	get: ( id, callback ) =>
-		callbackAsPromise( callback, store.get.bind( store, id ) ),
-	update: ( id, object, isIndexing, callback ) =>
-		callbackAsPromise( callback, store.update.bind( store, id, object, isIndexing ) ),
-	remove: ( id, callback ) =>
-		callbackAsPromise( callback, store.remove.bind( store, id ) ),
-	find: ( query, callback ) =>
-		callbackAsPromise( callback, store.find.bind( store, query ) )
+	get: ( id ) =>
+		callbackAsPromise( store.get.bind( store, id ) ),
+	update: ( id, object, isIndexing ) =>
+		callbackAsPromise( store.update.bind( store, id, object, isIndexing ) ),
+	remove: ( id ) =>
+		callbackAsPromise( store.remove.bind( store, id ) ),
+	find: ( query ) =>
+		callbackAsPromise( store.find.bind( store, query ) )
 } );
 
 export default function Bucket( name, storeProvider, channel ) {
@@ -49,7 +69,7 @@ export default function Bucket( name, storeProvider, channel ) {
 	this.isIndexing = false;
 
 	/**
-	 * Listeners for channel events
+	 * Listeners for channel events that will be added to Channel instance
 	 */
 	this.onChannelIndex = this.emit.bind( this, 'index' );
 	this.onChannelError = this.emit.bind( this, 'error' );
@@ -73,6 +93,14 @@ export default function Bucket( name, storeProvider, channel ) {
 
 inherits( Bucket, EventEmitter );
 
+/**
+ * Sets the channel the Bucket will use to sync changes.
+ *
+ * This exists to allow the Client to provide a backwards compatible API. There
+ * is probably no reason to change the Channel once it's already set.
+ *
+ * @param {Channel} channel - channel instance to use for syncing
+ */
 Bucket.prototype.setChannel = function( channel ) {
 	if ( this.channel ) {
 		this.channel
@@ -95,7 +123,7 @@ Bucket.prototype.setChannel = function( channel ) {
 };
 
 /**
- * Reloads all the data from Simperium
+ * Reloads all the data from the currently cached set of ghost data
  */
 Bucket.prototype.reload = function() {
 	this.channel.reload();
