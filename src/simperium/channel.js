@@ -27,7 +27,10 @@ const internal = {};
  * @returns {Promise<String>} the saved `cv`
  */
 internal.updateChangeVersion = function( cv ) {
-	return this.store.setChangeVersion( cv );
+	return this.store.setChangeVersion( cv ).then( () => {
+		this.emit( 'change-version', cv );
+		return cv;
+	} );
 };
 
 /**
@@ -182,9 +185,10 @@ internal.requestObjectVersion = function( id, version ) {
 };
 
 internal.applyChange = function( change, ghost ) {
-	var acknowledged = internal.findAcknowledgedChange.bind( this )( change ),
-		error,
-		emit,
+	const acknowledged = internal.findAcknowledgedChange.bind( this )( change ),
+		updateChangeVersion = internal.updateChangeVersion.bind( this, change.cv );
+
+	let error,
 		original,
 		patch,
 		modified;
@@ -204,8 +208,6 @@ internal.applyChange = function( change, ghost ) {
 		return;
 	}
 
-	emit = this.emit.bind( this, 'change-version', change.cv, change );
-
 	if ( change.o === operation.MODIFY ) {
 		if ( ghost && ( ghost.version !== change.sv ) ) {
 			internal.requestObjectVersion.call( this, change.id, change.sv ).then( data => {
@@ -217,10 +219,10 @@ internal.applyChange = function( change, ghost ) {
 		original = ghost.data;
 		patch = change.v;
 		modified = jsondiff.apply_object_diff( original, patch );
-		return internal.updateObjectVersion.bind( this )( change.id, change.ev, modified, original, patch, acknowledged )
-			.then( emit );
+		return internal.updateObjectVersion.call( this, change.id, change.ev, modified, original, patch, acknowledged )
+			.then( updateChangeVersion );
 	} else if ( change.o === operation.REMOVE ) {
-		return internal.removeObject.bind( this )( change.id, acknowledged ).then( emit );
+		return internal.removeObject.bind( this )( change.id, acknowledged ).then( updateChangeVersion );
 	}
 }
 
@@ -273,6 +275,9 @@ internal.indexingComplete = function() {
  * messages are stripped of their channel number that seperates bucket operations.
  * The `Client` maintains which commands should be routed to which channel.
  *
+ * The channel is responsible for creating all change operations and downloading
+ * bucket data.
+ *
  */
 export default function Channel( appid, access_token, store, name ) {
 	const channel = this;
@@ -310,7 +315,6 @@ export default function Channel( appid, access_token, store, name ) {
 
 	// Handle change errors caused by changes originating from this client
 	this.localQueue.on( 'error', internal.handleChangeError.bind( this ) );
-	this.on( 'change-version', internal.updateChangeVersion.bind( this ) );
 }
 
 /**
