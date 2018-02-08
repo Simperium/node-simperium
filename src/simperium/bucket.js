@@ -94,6 +94,9 @@ Bucket.prototype.setChannel = function( channel ) {
 		.on( 'remove', this.onChannelRemove );
 };
 
+/**
+ * Reloads all the data from Simperium
+ */
 Bucket.prototype.reload = function() {
 	this.channel.reload();
 };
@@ -116,7 +119,7 @@ Bucket.prototype.add = function( object, callback ) {
  *
  * @param {String} id - bucket object id
  * @param {Function} callback - with the data stored in the bucket
- * @return {Promise<Object>} the object data for the given id
+ * @return {Promise<Object>} the object id, data and indexing status
  */
 Bucket.prototype.get = function( id, callback ) {
 	return deprecateCallback( callback, this.storeAPI.get( id ) );
@@ -151,14 +154,37 @@ Bucket.prototype.update = function( id, data, options, callback ) {
 	return deprecateCallback( callback, task );
 };
 
+/**
+ * Check if the bucket has pending changes that have not yet been synced.
+ *
+ * @param {Function} [callback] - optional callback to receive response
+ * @returns {Promise<Boolean>} resolves to true if their are still changes to sync
+ */
 Bucket.prototype.hasLocalChanges = function( callback ) {
 	return deprecateCallback( callback, this.channel.hasLocalChanges() );
 };
 
+/**
+ * Gets the currently synced version number for the specified object id.
+ *
+ * A version of `0` indicates that an object has not been added to simperium yet.
+ *
+ * @param {String} id - object to get the version for
+ * @param {Function} [callback] - optional callback
+ * @returns {Promise<number>} - resolves to the current synced version
+ */
 Bucket.prototype.getVersion = function( id, callback ) {
 	return deprecateCallback( callback, this.channel.getVersion( id ) );
 };
 
+/**
+ * Attempts to sync the object specified by `id` using whatever data
+ * is locally stored for the object
+ *
+ * @param {String} id - object to sync
+ * @param {Function} [callback] - optional callback
+ * @returns {Promise<Object>} - object id, data
+ */
 Bucket.prototype.touch = function( id, callback ) {
 	const task = this.storeAPI.get( id )
 		.then( object => this.update( object.id, object.data ) );
@@ -166,6 +192,13 @@ Bucket.prototype.touch = function( id, callback ) {
 	return deprecateCallback( callback, task );
 };
 
+/**
+ * Deletes the object from the bucket
+ *
+ * @param {String} id - object to delete
+ * @param {Function} [callback] - optional callback
+ * @returns {Promise<Void>} - resolves when object has been deleted
+ */
 Bucket.prototype.remove = function( id, callback ) {
 	const task = this.storeAPI.remove( id )
 		.then( ( result ) => {
@@ -180,6 +213,13 @@ Bucket.prototype.find = function( query, callback ) {
 	return deprecateCallback( callback, this.storeAPI.find( query ) );
 };
 
+/**
+ * Gets all known past versions of an object
+ *
+ * @param {String} id - object to fetch revisions for
+ * @param {Function} [callback] - optional callback
+ * @returns {Promise<Array<Object>>} - list of objects with id, data and version
+ */
 Bucket.prototype.getRevisions = function( id, callback ) {
 	return deprecateCallback( callback, this.channel.getRevisions( id ) );
 }
