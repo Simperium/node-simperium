@@ -1,6 +1,6 @@
 // @flow
 import events from 'events'
-import https from 'https'
+import { request } from 'https'
 import url from 'url'
 
 // @flow
@@ -62,7 +62,7 @@ export class Auth extends EventEmitter {
 
 	request( endpoint: string, body: string ): Promise<User> {
 		return new Promise( ( resolve, reject ) => {
-			const req = https.request( this.getUrlOptions( endpoint ), ( res ) => {
+			const req = request( this.getUrlOptions( endpoint ), ( res ) => {
 				let responseData = '';
 
 				res.on( 'data', ( data ) => {
