@@ -15,9 +15,9 @@ deploy:
   provider: npm
   email: beaucollins@gmail.com
   api_key:
-    secure: g/QwhJTatuD/JTID1EhT528c4w+fcig61G24TbuYOceWlmeyHhIwHUGoF47epg81vPcLj84ynGAkTYB8VX1Zvy5vBc/D/T8K2aB6XWI/xrUWjE1LCOFTYbUOtuiNv+e6q0ScTyOgkhlo090fKPIW8DKEec4lDx6O3CLFM6LI+xc=
+    secure: dfBp3K8VZiZx/OE5hnlnGnvRhTOV+J4CbxLFIOKBvcpAomlV6y/nyqCrXLYvQRN62axXBVIWxTqheqqtP3gQ4PTKEEb4+T4CVZ9SUYD+5a3YAEi2eDFZwYMM2/TJZy2xoYEw4JFvQbgacEcStuGppA82abB/DMH3ig66z9mtApU=
   on:
     tags: true
     tag: next
     repo: Simperium/node-simperium
-    node: "8.0"
+    node: '8.0'
