@@ -1,7 +1,9 @@
 language: node_js
 sudo: false
 script:
+# lint errors fail the build
 - npm run lint
+# unit tests with coverage report
 - npm run test:coverage
 node_js:
 - '8.0'
@@ -11,13 +13,16 @@ cache:
   directories:
   - node_modules
 deploy:
+  # keeps necessary babel dependency for npm prepare
   skip_cleanup: true
   provider: npm
+  # dist-tag install using: npm -i simperium@next
+  tag: next
   email: beaucollins@gmail.com
   api_key:
     secure: N7HwM6lVVeG8dq0UT/U5njFVuW9O8xjpeXI9el6o2WpKPm3HdY1x5lx6PrbsFpY3l103vg135iA02tfkE7ct5sQcHtyYw6+UcrZ9Vr60lE9VS6HqODXSWt18ytSqmAlJGWlZ07kQediFv/Nyy6MiZERmn0Kgm2g3Lpcr7I25k9s=
   on:
+    # builds all tagged commits using node@8.0 environment
     tags: true
-    tag: next
     repo: Simperium/node-simperium
     node: '8.0'
