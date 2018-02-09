@@ -15,7 +15,7 @@ deploy:
   provider: npm
   email: beaucollins@gmail.com
   api_key:
-    secure: dfBp3K8VZiZx/OE5hnlnGnvRhTOV+J4CbxLFIOKBvcpAomlV6y/nyqCrXLYvQRN62axXBVIWxTqheqqtP3gQ4PTKEEb4+T4CVZ9SUYD+5a3YAEi2eDFZwYMM2/TJZy2xoYEw4JFvQbgacEcStuGppA82abB/DMH3ig66z9mtApU=
+    secure: N7HwM6lVVeG8dq0UT/U5njFVuW9O8xjpeXI9el6o2WpKPm3HdY1x5lx6PrbsFpY3l103vg135iA02tfkE7ct5sQcHtyYw6+UcrZ9Vr60lE9VS6HqODXSWt18ytSqmAlJGWlZ07kQediFv/Nyy6MiZERmn0Kgm2g3Lpcr7I25k9s=
   on:
     tags: true
     tag: next
