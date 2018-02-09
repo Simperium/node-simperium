@@ -6,9 +6,9 @@ script:
 # unit tests with coverage report
 - npm run test:coverage
 node_js:
-- '8.0'
-- '7.0'
-- '6.0'
+- '8'
+- '7'
+- '6'
 cache:
   directories:
   - node_modules
@@ -25,4 +25,4 @@ deploy:
     # builds all tagged commits using node@8.0 environment
     tags: true
     repo: Simperium/node-simperium
-    node: '8.0'
+    node: '8'
