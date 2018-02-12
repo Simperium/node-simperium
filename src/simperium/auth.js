@@ -4,13 +4,19 @@ import { request } from 'https'
 import url from 'url'
 
 // @flow
-type User = {};
+type User = {
+	options: {},
+	access_token: string,
+};
 
-const fromJSON = ( json: string ) => {
-	const data = JSON.parse( json );
+const fromJSON = ( json: string ): User => {
+	const data: {} = JSON.parse( json );
+	if ( ! data.access_token && typeof data.access_token !== 'string' ) {
+		throw new Error( 'access_token not present' );
+	}
 	return {
 		options: data,
-		access_token: data.access_token
+		access_token: new String( data.access_token ).toString()
 	};
 };
 
@@ -27,16 +33,32 @@ export class AuthError extends Error {
 	}
 }
 
+/**
+ * Client for creating and authenticating Simperium.com user accounts.
+ */
 export class Auth extends EventEmitter {
 	appId: string
 	appSecret: string
 
+	/**
+	 * Creates an instance of the Auth client
+	 *
+	 * @param {string} appId - Simperium.com application ID
+	 * @param {string} appSecret - Simperium.com application secret
+	 */
 	constructor( appId: string, appSecret: string ) {
 		super();
 		this.appId = appId;
 		this.appSecret = appSecret;
 	}
 
+	/**
+	 * Authorizes a user account with username and password
+	 *
+	 * @param {string} username account username
+	 * @param {string} password account password
+	 * @returns {Promise<User>} user account data
+	 */
 	authorize( username: string, password: string ) {
 		const body = JSON.stringify( { username: username, password: password } );
 		return this.request( 'authorize/', body );

@@ -51,6 +51,15 @@ describe( 'Auth', () => {
 			} );
 	} );
 
+	it( 'should fail if missing access_token', () => {
+		stubResponse( '{"hello":"world"}' );
+		return auth.authorize( 'username', 'password' )
+			.catch( error => {
+				equal( error.message, 'Failed to authenticate user.' );
+				equal( error.underlyingError.message, 'access_token not present' );
+			} );
+	} );
+
 	it( 'should fail to auth with invalid credentials', () => {
 		stubResponse( 'this is not json' )
 
