@@ -1,6 +1,20 @@
 import uuid from 'node-uuid'
 import jsondiff from '../jsondiff'
 
+/**
+ * @typedef {object} Change
+ * @property {string} id id of changed Entity
+ * @property {string} o type of Entity change - see below operation types
+ * @property {object} v jsondiff object for each property
+ * @property {string} ccid client-generated unique id for changeset
+ */
+
+/**
+ * @typedef {object} Changeset
+ * @property {string} id id of Entity being changed
+ * @property {Array<Change>} ccids sequence of changes contained in changeset
+ */
+
 const changeTypes = {
 	MODIFY: 'M',
 	REMOVE: '-',
@@ -42,27 +56,50 @@ function buildChangeFromOrigin( type, id, version, target, origin ) {
 	return changeData;
 }
 
-function compressChanges( changes, origin ) {
-	var modified;
-
+/**
+ * Combine a sequence of changes into a single change object
+ *
+ * We will take a simple approach by starting with the base Entity
+ * and apply each transformation to it in succession.
+ * At the end of the iteration we'll take a final diff against
+ * how that Entity started and that will equal the combined change.
+ *
+ * @TODO: Could we more easily rebase the changes without the base Entity?
+ *
+ * @param {Array<Change>} changes to apply in order
+ * @param {object} baseEntity start Entity which changes modify
+ * @returns {?Change} change representing all of the combined input changes
+ */
+function compressChanges( changes, baseEntity ) {
+	// no changes is an empty changeset - don't do anything
 	if ( changes.length === 0 ) {
 		return {};
 	}
 
+	// if we only have a single change, that's it!
 	if ( changes.length === 1 ) {
 		return changes[0].v;
 	}
 
-	modified = changes.reduce( function( from, change ) {
-		// deletes when, any changes after a delete are ignored
-		if ( from === null ) return null;
-		if ( from.o === changeTypes.REMOVE ) return null;
-		return apply_object_diff( from, change.v );
-	}, origin );
+	/**
+	 * Otherwise we need to iterate
+	 *
+	 * At the first point in time where we remove the Entity
+	 * we will want to short-circuit the rest of the changes.
+	 *
+	 * @type {?Object} the Entity as it's transformed
+	 */
+	const finalEntity = changes.reduce( ( combined, change ) =>
+		( null !== combined && changeTypes.REMOVE !== combined.o )
+			? apply_object_diff( combined, change.v )
+			: null,
+		baseEntity
+	);
 
-	if ( modified === null ) return null;
-
-	return object_diff( origin, modified );
+	// null indicates that the Entity should be removed
+	return finalEntity !== null
+		? object_diff( baseEntity, finalEntity )
+		: null;
 }
 
 function rebase( local_diff, remote_diff, origin ) {
