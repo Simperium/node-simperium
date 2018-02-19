@@ -1,3 +1,4 @@
+// @flow
 import { format, inherits } from 'util'
 import { EventEmitter } from 'events'
 import Bucket from './bucket'

@@ -1,5 +1,6 @@
-export default function( data ) {
-	var marker = data.indexOf( ':' );
+// @flow
+export default ( data: string ) => {
+	const marker = data.indexOf( ':' );
 
 	return {
 		command: data.slice( 0, marker ),

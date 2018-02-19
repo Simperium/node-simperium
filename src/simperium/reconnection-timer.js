@@ -1,3 +1,4 @@
+// @flow
 export default class ReconnectionTimer {
 	started: boolean
 	interval: number => number;

@@ -1,3 +1,4 @@
+// @flow
 /**
  * An in memory implementation of GhostStore
  *

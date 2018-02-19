@@ -243,7 +243,7 @@ describe( 'Channel', function() {
 			return new Promise( ( resolve ) => {
 				bucket.on( 'update', () => {
 					bucket.get( 'object' ).then( ( object ) => {
-						equal( object.content, 'step 1' );
+						equal( object.data.content, 'step 1' );
 						resolve();
 					} );
 				} );
@@ -326,7 +326,7 @@ describe( 'Channel', function() {
 
 		// If receiving a remote change while there are unsent local modifications,
 		// local changes should be rebased onto the new ghost and re-sent
-		it( 'should resolve applying patch to modified object', () => new Promise( ( resolve ) => {
+		it.only( 'should resolve applying patch to modified object', () => new Promise( ( resolve, reject ) => {
 			// add an item to the index
 			const key = 'hello',
 				current = { title: 'Hello world' },
@@ -337,22 +337,29 @@ describe( 'Channel', function() {
 			// when the channel is updated, it should be the result of
 			// the local changes being rebased on top of changes coming from the
 			// network which should ultimately be "Goodbye kansas"
-			channel.on( 'update', function( key, data ) {
-				equal( data.title, 'Goodbye kansas' );
+			channel.on( 'send', ( data ) => {
+				console.log( 'channel is sending', data );
 			} );
-
-			channel.on( 'send', function() {
-				equal( channel.localQueue.sent[key].v.title.v, '-5\t+Goodbye\t=6' );
-				resolve();
+			channel.on( 'send', () => {
+				console.log( 'requesting object' );
+				bucket.get( key ).then( bucketObject => {
+					try {
+						equal( channel.localQueue.sent[key].v.title.v, '-5\t+Goodbye\t=7' );
+						equal( bucketObject.data.title, 'Goodbye kansas' );
+						resolve();
+					} catch ( error ) {
+						reject( error );
+					}
+				} );
 			} );
-
-			// We receive a remote change from "Hello world" to "Hello kansas"
-			channel.handleMessage( 'c:' + JSON.stringify( [{
-				o: 'M', ev: 2, sv: 1, cv: 'cv1', id: key, v: remoteDiff
-			}] ) );
 
 			// We're changing "Hello world" to "Goodbye world"
-			bucket.update( key, {title: 'Goodbye world'} );
+			bucket.update( key, {title: 'Goodbye world'} ).then( () => {
+				// We receive a remote change from "Hello world" to "Hello kansas"
+				channel.handleMessage( 'c:' + JSON.stringify( [{
+					o: 'M', ev: 2, sv: 1, cv: 'cv1', id: key, v: remoteDiff
+				}] ) );
+			} );
 		} ) );
 
 		it( 'should emit errors on the bucket instance', ( done ) => {

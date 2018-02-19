@@ -1,7 +1,10 @@
+// @flow
 import { v4 as uuid } from 'uuid'
 import jsondiff from '../jsondiff'
 
-const changeTypes = {
+type ChangeType = 'M' | '-' | '+'
+
+const changeTypes: { [string]: ChangeType } = {
 	MODIFY: 'M',
 	REMOVE: '-',
 	ADD: '+'
