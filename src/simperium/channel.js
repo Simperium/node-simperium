@@ -217,7 +217,6 @@ const updateObjectVersion = ( channel: Channel, id: string, version: number, dat
 		localModifications = change_util.compressChanges( changes, original );
 		remoteModifications = patch;
 		transformed = change_util.transform( localModifications, remoteModifications, original );
-		console.log( 'shall we transform?', localModifications, remoteModifications, transformed );
 		update = data;
 
 		// apply the transformed patch and emit the update
@@ -226,7 +225,6 @@ const updateObjectVersion = ( channel: Channel, id: string, version: number, dat
 			update = jsondiff.apply_object_diff( data, transformed );
 			// queue up the new change
 			change = change_util.modify( id, version, patch );
-			console.log( 'new transformed change to queue', change );			
 			channel.localQueue.queue( change );
 		}
 
@@ -467,7 +465,6 @@ export default class Channel extends EventEmitter {
 	update( object: BucketObject, sync: boolean = true ) {
 		this.onBucketUpdate( object.id );
 		if ( sync === true ) {
-			console.log( 'diff and send', object );
 			diffAndSend( this, object.id, object.data );
 		}
 	};

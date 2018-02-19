@@ -326,7 +326,7 @@ describe( 'Channel', function() {
 
 		// If receiving a remote change while there are unsent local modifications,
 		// local changes should be rebased onto the new ghost and re-sent
-		it.only( 'should resolve applying patch to modified object', () => new Promise( ( resolve, reject ) => {
+		it( 'should resolve applying patch to modified object', () => new Promise( ( resolve, reject ) => {
 			// add an item to the index
 			const key = 'hello',
 				current = { title: 'Hello world' },
@@ -337,15 +337,11 @@ describe( 'Channel', function() {
 			// when the channel is updated, it should be the result of
 			// the local changes being rebased on top of changes coming from the
 			// network which should ultimately be "Goodbye kansas"
-			channel.on( 'send', ( data ) => {
-				console.log( 'channel is sending', data );
-			} );
 			channel.on( 'send', () => {
-				console.log( 'requesting object' );
-				bucket.get( key ).then( bucketObject => {
+				bucket.once( 'update', ( id, data ) => {
 					try {
+						equal( data.title, 'Goodbye kansas' );
 						equal( channel.localQueue.sent[key].v.title.v, '-5\t+Goodbye\t=7' );
-						equal( bucketObject.data.title, 'Goodbye kansas' );
 						resolve();
 					} catch ( error ) {
 						reject( error );

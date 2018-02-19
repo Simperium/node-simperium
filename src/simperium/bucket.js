@@ -1,27 +1,10 @@
 // @flow
 import events from 'events'
-import { v4 as uuid } from 'uuid';
+import uuid from 'uuid/v4';
 
 const { EventEmitter } = events;
 
 type TaskCallback<T> = ( ?Error, ?T ) => void;
-
-/**
- * Convenience function to turn a function that uses a callback into a function
- * that returns a Promise.
- *
- * @param {TaskCallback} task - function that expects a single callback argument
- * @returns {Promise} callback wrapped in a promise interface
- */
-const callbackAsPromise = <T>( task: ( TaskCallback<T> ) => void ): Promise<?T> => new Promise( ( resolve, reject ) => {
-	task( ( error: ?Error, result: ?T ) => {
-		if ( error ) {
-			reject( error );
-			return;
-		}
-		resolve( result );
-	} );
-} );
 
 /**
  * Runs a promise with a callback (if one is provided) to support the old callback API.
@@ -108,9 +91,7 @@ export type BucketObjectRevision = {
 
 type RevisionList = BucketObjectRevision[];
 
-interface Channel {
-	removeListener( eventName: string, listener: ?any ) : Channel;
-	on( eventName: string, listener: any ) : Channel;
+interface Channel extends EventEmitter {
 	reload(): void;
 	update( object: BucketObject, sync: boolean ): void;
 	remove( id: string ): void;
@@ -146,7 +127,7 @@ type bucketStoreGetCallback = ( ?Error, ?BucketObject ) => void
  * @param {?BucketObject[]}
  */
 
- interface BucketStoreAPI {
+ type BucketStoreAPI = {
 	get: ( id: string ) => Promise<BucketObject>;
 	update: ( id: string, data: {}, isIndexing: boolean ) => Promise<BucketObject>;
 	remove: ( id: string ) => Promise<void>;
@@ -159,14 +140,55 @@ type bucketStoreGetCallback = ( ?Error, ?BucketObject ) => void
  * @returns {Object} store api methods that use Promises instead of callbacks
  */
 const promiseAPI = ( store: BucketStore ): BucketStoreAPI => ( {
-	get: id =>
-		callbackAsPromise( store.get.bind( store, id ) ),
-	update: ( id, object, isIndexing ) =>
-		callbackAsPromise( store.update.bind( store, id, object, isIndexing ) ),
-	remove: id =>
-		callbackAsPromise( store.remove.bind( store, id ) ),
-	find: query =>
-		callbackAsPromise( store.find.bind( store, query ) )
+	get: ( id: string ) => new Promise( ( resolve, reject ) => {
+		store.get( id, ( error, bucketObject ) => {
+			if ( error ) {
+				reject( error );
+				return;
+			}
+			if ( bucketObject ) {
+				resolve( bucketObject );
+				return;
+			}
+			reject( new Error( 'BucketStore failed get without Error' ) );
+		} );
+	} ),
+	update: ( id: string, data: {}, isIndexing: boolean ) => new Promise( ( resolve, reject ) => {
+		store.update(id, data, isIndexing, ( error, bucketObject ) => {
+			if ( error ) {
+				reject( error );
+				return;
+			}
+			if ( bucketObject ) {
+				resolve( bucketObject );
+				return;
+			}
+			// this shouldn't happen, come up with good error message
+			reject( new Error( 'BucketStore failed update without error' ) );
+		} );
+	} ),
+	remove: ( id: string ) => new Promise( ( resolve, reject ) => {
+		store.remove( id, ( error ) => {
+			if ( error ) {
+				reject( error );
+				return;
+			}
+			resolve();
+		} )
+	} ),
+	find: ( query: ?any ) => new Promise( ( resolve, reject ) => {
+		store.find( query, ( error, result ) => {
+			if ( error ) {
+				reject( error );
+				return;
+			}
+			if ( result ) {
+				resolve( result );
+				return;
+			}
+			reject( new Error( 'BucketStore failed find without error' ) );
+		} )
+	} )
 } );
 
 type updateOptions = { sync: boolean } | bucketStoreGetCallback
@@ -178,11 +200,11 @@ export default class Bucket extends EventEmitter {
 	isIndexing: boolean;
 	channel: Channel;
 
-	onChannelIndex: any;
-	onChannelError: any;
-	onChannelUpdate: any;
-	onChannelIndexingStateChange: any;
-	onChannelRemove: any;
+	onChannelIndex: Function;
+	onChannelError: Function;
+	onChannelUpdate: Function;
+	onChannelIndexingStateChange: Function;
+	onChannelRemove: Function;
 
 	/**
 	 * A bucket that syncs data with Simperium.
@@ -191,7 +213,7 @@ export default class Bucket extends EventEmitter {
 	 * @param {bucketStoreProvider} storeProvider - a factory function that provides a bucket store
 	 * @param {Channel} channel - a channel instance used for syncing Simperium data
 	 */
-	constructor( name: string, storeProvider: BucketStoreProvider, channel: Channel ) {
+	constructor( name: string, storeProvider: BucketStoreProvider, channel: ?Channel ) {
 		super();
 		this.name = name;
 		this.store = storeProvider( this );
@@ -203,18 +225,18 @@ export default class Bucket extends EventEmitter {
 		 */
 		this.onChannelIndex = this.emit.bind( this, 'index' );
 		this.onChannelError = this.emit.bind( this, 'changeError' );
-		this.onChannelUpdate = ( id, data ) => {
+		this.onChannelUpdate = ( id: string, data: {} ) => {
 			this.update( id, data, { sync: false } );
 		};
 
-		this.onChannelIndexingStateChange = ( isIndexing ) => {
+		this.onChannelIndexingStateChange = ( isIndexing: boolean ) => {
 			this.isIndexing = isIndexing;
 			if ( isIndexing ) {
 				this.emit( 'indexing' );
 			}
 		}
 
-		this.onChannelRemove = ( id ) => this.remove( id );
+		this.onChannelRemove = ( id: string ) => this.remove( id );
 
 		if ( channel ) {
 			this.setChannel( channel );
@@ -223,18 +245,18 @@ export default class Bucket extends EventEmitter {
 
 	// NOTE: for backwards compatibility, listeners for `error` will
 	// be subscribed to `changeError`
-	on( eventName: string, listener: Function ): Bucket {
+	addListener( eventName: string, listener: ( ... args: any[] ) => void ): this {
 		if ( eventName === 'error' ) {
 			// TODO: deprecation warning
-			return super.on( 'changeError', listener );
+			return super.addListener( 'changeError', listener );
 		}
-		return super.on( eventName, listener );
+		return super.addListener( eventName, listener );
 	}
 
-	removeListener( eventName: string, listener: Function ): Bucket {
+	removeListener( eventName: string, listener: Function ): this {
 		if ( eventName === 'error' ) {
 			// TODO: deprecation warning
-			return super.removeListener( 'changeError', listener);
+			return super.removeListener( 'changeError', listener );
 		}
 		return super.removeListener( eventName, listener );
 	}
