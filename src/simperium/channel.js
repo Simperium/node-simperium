@@ -3,7 +3,7 @@ import { format, inherits } from 'util'
 import { EventEmitter } from 'events'
 import { parseMessage, parseVersionMessage, change as change_util } from './util'
 import JSONDiff from './jsondiff'
-import uuid from 'node-uuid'
+import { v4 as uuid } from 'uuid'
 
 const jsondiff = new JSONDiff( {list_diff: false} );
 
@@ -12,19 +12,35 @@ const CODE_INVALID_VERSION = 405;
 const CODE_EMPTY_RESPONSE = 412;
 const CODE_INVALID_DIFF = 440;
 
-var operation = {
+const operation = {
 	MODIFY: 'M',
 	REMOVE: '-'
 };
 
-var internal = {};
+// internal methods used as instance methods on a Channel instance
+const internal = {};
 
+/**
+ * Updates the currently known synced `cv`.
+ *
+ * @param {String} cv - the change version synced
+ * @returns {Promise<String>} the saved `cv`
+ */
 internal.updateChangeVersion = function( cv ) {
-	return this.store.setChangeVersion( cv );
+	return this.store.setChangeVersion( cv ).then( () => {
+		// A unit test currently relies on this event, otherwise we can remove it
+		this.emit( 'change-version', cv );
+		return cv;
+	} );
 };
 
-// Called when receive a change from the network. Attempt to apply the change
-// to the ghost object and notify.
+/**
+ * Called when receive a change from the network. Attempt to apply the change
+ * to the ghost object and notify.
+ *
+ * @param {String} id - id of the object changed
+ * @param {Object} change - the change to apply to the object
+ */
 internal.changeObject = function( id, change ) {
 	// pull out the object from the store and apply the change delta
 	var applyChange = internal.performChange.bind( this, change );
@@ -34,6 +50,16 @@ internal.changeObject = function( id, change ) {
 	} );
 };
 
+/**
+ * Creates a change operation for the object of `id` that changes
+ * from the date stored in the `ghost` into the data of `object`.
+ *
+ * Queues the change for syncing.
+ *
+ * @param {String} id - object id
+ * @param {Object} object - object literal of the data that the change should produce
+ * @param {Object} ghost - the ghost version used to produce the change object
+ */
 internal.buildModifyChange = function( id, object, ghost ) {
 	var payload = change_util.buildChange( change_util.type.MODIFY, id, object, ghost ),
 		empty = true,
@@ -46,19 +72,26 @@ internal.buildModifyChange = function( id, object, ghost ) {
 		}
 	}
 
-	if ( empty ) return this.emit( 'unmodified', id, object, ghost );
+	if ( empty ) {
+		this.emit( 'unmodified', id, object, ghost );
+		return;
+	}
 
 	// if the change v is an empty object, do not send, notify?
 	this.localQueue.queue( payload );
 };
 
-internal.buildRemoveChange = function( id, object, ghost ) {
-	var payload = change_util.buildChange( change_util.type.REMOVE, id, object, ghost );
+/**
+ * Creates a change object that deletes an object from a bucket.
+ *
+ * Queues the change for syncing.
+ *
+ * @param {String} id - object to remove
+ * @param {Object} ghost - current ghost object for the given id
+ */
+internal.buildRemoveChange = function( id, ghost ) {
+	var payload = change_util.buildChange( change_util.type.REMOVE, id, {}, ghost );
 	this.localQueue.queue( payload );
-};
-
-internal.sendChange = function( data ) {
-	this.emit( 'send', format( 'c:%s', JSON.stringify( data ) ) );
 };
 
 internal.diffAndSend = function( id, object ) {
@@ -66,8 +99,8 @@ internal.diffAndSend = function( id, object ) {
 	return this.store.get( id ).then( modify );
 };
 
-internal.removeAndSend = function( id, object ) {
-	var remove = internal.buildRemoveChange.bind( this, id, object );
+internal.removeAndSend = function( id ) {
+	var remove = internal.buildRemoveChange.bind( this, id );
 	return this.store.get( id ).then( remove );
 };
 
@@ -101,7 +134,7 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 			this.localQueue.queue( change );
 		}
 
-		notify = this.emit.bind( this, 'update', id, update, original, patch, this.bucket.isIndexing );
+		notify = this.emit.bind( this, 'update', id, update, original, patch, this.isIndexing );
 	} else {
 		notify = internal.updateAcknowledged.bind( this, acknowledged );
 	}
@@ -152,9 +185,10 @@ internal.requestObjectVersion = function( id, version ) {
 };
 
 internal.applyChange = function( change, ghost ) {
-	var acknowledged = internal.findAcknowledgedChange.bind( this )( change ),
-		error,
-		emit,
+	const acknowledged = internal.findAcknowledgedChange.bind( this )( change ),
+		updateChangeVersion = internal.updateChangeVersion.bind( this, change.cv );
+
+	let error,
 		original,
 		patch,
 		modified;
@@ -174,8 +208,6 @@ internal.applyChange = function( change, ghost ) {
 		return;
 	}
 
-	emit = this.emit.bind( this, 'change-version', change.cv, change );
-
 	if ( change.o === operation.MODIFY ) {
 		if ( ghost && ( ghost.version !== change.sv ) ) {
 			internal.requestObjectVersion.call( this, change.id, change.sv ).then( data => {
@@ -187,10 +219,10 @@ internal.applyChange = function( change, ghost ) {
 		original = ghost.data;
 		patch = change.v;
 		modified = jsondiff.apply_object_diff( original, patch );
-		return internal.updateObjectVersion.bind( this )( change.id, change.ev, modified, original, patch, acknowledged )
-			.then( emit );
+		return internal.updateObjectVersion.call( this, change.id, change.ev, modified, original, patch, acknowledged )
+			.then( updateChangeVersion );
 	} else if ( change.o === operation.REMOVE ) {
-		return internal.removeObject.bind( this )( change.id, acknowledged ).then( emit );
+		return internal.removeObject.bind( this )( change.id, acknowledged ).then( updateChangeVersion );
 	}
 }
 
@@ -219,29 +251,132 @@ internal.handleChangeError = function( err, change, acknowledged ) {
 
 internal.indexingComplete = function() {
 	// Indexing has finished
-	this.bucket.isIndexing = false;
+	this.setIsIndexing( false );
+
+	internal.updateChangeVersion.call( this, this.index_cv )
+		.then( () => {
+			this.localQueue.start();
+		} );
+
 	this.emit( 'index', this.index_cv );
 
 	this.index_last_id = null;
 	this.index_cv = null;
-	this.bucket.removeListener( 'update', this.bucketUpdateListener );
 	this.emit( 'ready' )
 }
 
-export default function Channel( appid, access_token, bucket, store ) {
-	var channel = this;
-	var message = this.message = new EventEmitter();
-	var bucketEvents = new EventEmitter(),
-		update = bucket.update,
-		remove = bucket.remove;
+/**
+ * A ghost represents a version of a bucket object as known by Simperium
+ *
+ * Generally a client will keep the last known ghost stored locally for efficient
+ * diffing and patching of Simperium change operations.
+ *
+ * @typedef {Object} Ghost
+ * @property {Number} version - the ghost's version
+ * @property {String} key - the simperium bucket object id this ghost is for
+ * @property {Object} data - the data for the given ghost version
+ */
 
+/**
+ * Callback function used by the ghost store to iterate over existing ghosts
+ *
+ * @callback ghostIterator
+ * @param {Ghost} - the current ghost
+ */
+
+/**
+ * A GhostStore provides the store mechanism for ghost data that the Channel
+ * uses to maintain syncing state and producing change operations for
+ * Bucket objects.
+ *
+ * @interface GhostStore
+ */
+
+/**
+ * Retrieve a Ghost for the given bucket object id
+ *
+ * @function
+ * @name GhostStore#get
+ * @param {String} id - bucket object id
+ * @returns {Promise<Ghost>} - the ghost for this object
+ */
+
+/**
+ * Save a ghost in the store.
+ *
+ * @function
+ * @name GhostStore#put
+ * @param {String} id - bucket object id
+ * @param {Number} version - version of ghost data
+ * @param {Object} data - object literal to save as this ghost's data for this version
+ * @returns {Promise<Ghost>} - the ghost for this object
+ */
+
+/**
+ * Delete a Ghost from the store.
+ *
+ * @function
+ * @name GhostStore#remove
+ * @param {String} id - bucket object id
+ * @returns {Promise<Ghost>} - the ghost for this object
+ */
+
+/**
+ * Iterate over existing Ghost objects with the given callback.
+ *
+ * @function
+ * @name GhostStore#eachGhost
+ * @param {ghostIterator} - function to run against each ghost
+ */
+
+/**
+ * Get the current change version (cv) that this channel has synced.
+ *
+ * @function
+ * @name GhostStore#getChangeVersion
+ * @returns {Promise<String>} - the current change version for the bucket
+ */
+
+/**
+ * Set the current change version.
+ *
+ * @function
+ * @name GhostStore#setChangeVersion
+ * @returns {Promise<Void>} - resolves once the change version is saved
+ */
+
+
+/**
+ * Maintains syncing state for a Simperium bucket.
+ *
+ * A bucket uses a channel to listen for updates that come from simperium while
+ * sending updates that are made on the client.
+ *
+ * The channel can handle incoming simperium commands via `handleMessage`. These
+ * messages are stripped of their channel number that separates bucket operations.
+ * The `Client` maintains which commands should be routed to which channel.
+ *
+ * The channel is responsible for creating all change operations and downloading
+ * bucket data.
+ *
+ * @param {String} appid - Simperium app id, used for authenticating
+ * @param {String} access_token - Simperium user access token
+ * @param {GhostStore} store - data storage for ghost objects
+ * @param {String} name - the name of the bucket on Simperium.com
+ */
+export default function Channel( appid, access_token, store, name ) {
+	// Uses an event emitter to handle different Simperium  commands
+	const message = this.message = new EventEmitter();
+
+	this.name = name;
+	this.isIndexing = false;
 	this.appid = appid;
-	this.bucket = bucket;
 	this.store = store;
 	this.access_token = access_token;
 
-	this.session_id = 'node-' + uuid.v4();
+	this.session_id = 'node-' + uuid();
 
+	// These are the simperium bucket commands the channel knows how to handle
 	message.on( 'auth', this.onAuth.bind( this ) );
 	message.on( 'i', this.onIndex.bind( this ) );
 	message.on( 'c', this.onChanges.bind( this ) );
@@ -249,115 +384,165 @@ export default function Channel( appid, access_token, bucket, store ) {
 	message.on( 'cv', this.onChangeVersion.bind( this ) );
 	message.on( 'o', function() {} );
 
+	// Maintain a queue of operations that come from simperium commands
+	// so that the can be applied to the ghost data.
 	this.networkQueue = new NetworkQueue();
+	// Maintain a queue of operations that originate from this client
+	// to track their status.
 	this.localQueue = new LocalQueue( this.store );
 
-	this.localQueue.on( 'send', internal.sendChange.bind( this ) );
-	this.localQueue.on( 'error', internal.handleChangeError.bind( this ) );
-
-	this.on( 'index', function( cv ) {
-		internal.updateChangeVersion.call( channel, cv ).then( function() {
-			channel.localQueue.start();
-		} );
-		bucket.emit( 'index' );
+	// When a local queue has indicatie that it should send a change operation
+	// emit a simperium command. The Client instance will know how to route that
+	// command correctly to simperium
+	this.localQueue.on( 'send', ( data ) => {
+		this.emit( 'send', `c:${ JSON.stringify( data ) }` );
 	} );
 
-	// forward errors to bucket instance
-	this.on( 'error', bucket.emit.bind( bucket, 'error' ) )
-
-	bucket.update = function( id, object, options, callback ) {
-		if ( typeof options === 'function' ) {
-			callback = options;
-			options = { sync: true };
-		}
-
-		if ( !!options === false ) {
-			options = { sync: true };
-		}
-
-		return update.call( bucket, id, object, options, function( err, object ) {
-			if ( !err ) bucket.emit( 'update', id, object.data );
-			if ( !err && options.sync !== false ) bucketEvents.emit( 'update', id, object.data );
-			if ( callback ) callback.apply( this, arguments );
-		} );
-	};
-
-	bucket.remove = function( id, callback ) {
-		return remove.call( bucket, id, function( err ) {
-			if ( !err ) bucketEvents.emit( 'remove', id );
-			if ( callback ) callback.apply( this, arguments );
-		} );
-	};
-
-	bucket.getRevisions = function( id, callback ) {
-		collectionRevisions( channel, id, callback );
-	};
-
-	bucket.hasLocalChanges = function( callback ) {
-		callback( null, channel.localQueue.hasChanges() );
-	};
-
-	bucket.getVersion = function( id, callback ) {
-		store.get( id ).then(
-			( ghost ) => {
-				var version = 0;
-				if ( ghost && ghost.version ) {
-					version = ghost.version;
-				}
-				callback( null, version );
-			},
-			// callback with error if promise fails
-			callback
-		);
-	};
-
-	bucketEvents
-		.on( 'update', internal.diffAndSend.bind( this ) )
-		.on( 'remove', internal.removeAndSend.bind( this ) );
-
-	// when the network sends in an update or remove, update the bucket data
-	this
-		.on( 'update', function( id, data ) {
-			var args = [].slice.call( arguments );
-			update.call( bucket, id, data, {sync: false}, function() {
-				bucket.emit.apply( bucket, ['update'].concat( args ) );
-			} );
-		} )
-		.on( 'remove', function( id ) {
-			remove.call( bucket, id, function() {
-				bucket.emit( 'remove', id );
-			} );
-		} );
-
-	bucket.on( 'reload', this.onReload.bind( this ) );
-	this.bucketUpdateListener = this.onBucketUpdate.bind( this );
-	bucket.on( 'update', this.bucketUpdateListener );
-
-	this.on( 'change-version', internal.updateChangeVersion.bind( this ) );
+	// Handle change errors caused by changes originating from this client
+	this.localQueue.on( 'error', internal.handleChangeError.bind( this ) );
 }
 
 inherits( Channel, EventEmitter );
 
+/**
+ * Called by a bucket when a bucket object has been updated.
+ *
+ * The channel uses this method to initiate change operations when objects are updated.
+ *
+ * It also uses this method during indexing to track which objects have been successfully
+ * downloaded.
+ *
+ * @param {BucketObject} object - the bucket object
+ * @param {Boolean} [sync=true] - if the object should be synced
+ */
+Channel.prototype.update = function( object, sync = true ) {
+	this.onBucketUpdate( object.id );
+	if ( sync === true ) {
+		internal.diffAndSend.call( this, object.id, object.data );
+	}
+};
+
+/**
+ * Tracks indexing state and emits `indexingStateChange`
+ *
+ * @private
+ * @param {Boolean} isIndexing - updates indexing state to this value
+ */
+Channel.prototype.setIsIndexing = function( isIndexing ) {
+	this.isIndexing = isIndexing;
+	this.emit( 'indexingStateChange', this.isIndexing );
+}
+
+/**
+ * Removes an object from Simperium. Called by a bucket when an object is deleted.
+ *
+ * @param {String} id - the id of the object to remove
+ */
+Channel.prototype.remove = function( id ) {
+	internal.removeAndSend.call( this, id )
+}
+
+/**
+ * Retrieves revisions for a given object from Simperium.
+ *
+ * @typedef {Object} BucketObjectRevision
+ * @property {String} id - bucket object id
+ * @property {Number} version - revision version
+ * @property {Object} data - object literal data at given version
+ *
+ * @param {String} id - the bucket object id
+ * @returns {Promise<Array<BucketObjectRevision>>} list of known object versions
+ */
+Channel.prototype.getRevisions = function( id ) {
+	return new Promise( ( resolve, reject ) => {
+		collectionRevisions( this, id, ( error, revisions ) => {
+			if ( error ) {
+				reject( error );
+				return;
+			}
+			resolve( revisions );
+		} );
+	} );
+}
+
+/**
+ * Checks if there are unsynced changes.
+ *
+ * @returns {Promise<Boolean>} true if there are still changes to sync
+ */
+Channel.prototype.hasLocalChanges = function() {
+	return Promise.resolve( this.localQueue.hasChanges() );
+}
+
+/**
+ * Retrieves the currently stored version number for a given object
+ *
+ * @param {String} id - object id to get the version for
+ * @returns {Promise<Number>} version number for the object
+ */
+Channel.prototype.getVersion = function( id ) {
+	return this.store.get( id ).then( ( ghost ) => {
+		if ( ghost && ghost.version ) {
+			return ghost.version;
+		}
+		return 0;
+	} );
+}
+
+/**
+ * Receives incoming messages from Simperium
+ *
+ * Called by a client that strips the channel number prefix before
+ * seding to a specific channel.
+ *
+ * @param {String} data - the message from Simperium
+ */
 Channel.prototype.handleMessage = function( data ) {
 	var message = parseMessage( data );
 	this.message.emit( message.command, message.data );
 };
 
+/**
+ * Used to send a message from this channel to Simperium
+ * The client listens for `send` events and correctly sends them to Simperium
+ *
+ * @emits Channel#send
+ * @private
+ * @param {String} data - the message to send
+ */
 Channel.prototype.send = function( data ) {
+	/**
+	 * Send event
+	 *
+	 * @event Channel#send
+	 * @type {String} - the message to send to Simperium
+	 */
 	this.emit( 'send', data );
 };
 
-Channel.prototype.onReload = function() {
-	var emit = this.emit.bind( this, 'update' );
-	this.store.eachGhost( function( ghost ) {
-		emit( ghost.key, ghost.data );
+/**
+ * Restores a buckets data to what is currently stored in the ghost data.
+ */
+Channel.prototype.reload = function() {
+	this.store.eachGhost( ghost => {
+		this.emit( 'update', ghost.key, ghost.data );
 	} );
 };
 
-Channel.prototype.onBucketUpdate = function( noteId ) {
+/**
+ * Called after a bucket updates an object.
+ *
+ * Wile indexing keeps track of which objects have been retrieved.
+ *
+ * @param {String} id - object that was updated
+ */
+Channel.prototype.onBucketUpdate = function( id ) {
+	if ( ! this.isIndexing ) {
+		return;
+	}
 	if ( this.index_last_id == null || this.index_cv == null ) {
 		return;
-	} else if ( this.index_last_id === noteId ) {
+	} else if ( this.index_last_id === id ) {
 		internal.indexingComplete.call( this );
 	}
 };
@@ -389,16 +574,21 @@ Channel.prototype.onAuth = function( data ) {
 	}
 };
 
+/**
+ * Re-downloads all Simperium bucket data
+ */
 Channel.prototype.startIndexing = function() {
 	this.localQueue.pause();
-	this.bucket.isIndexing = true;
-	this.bucket.emit( 'indexing' );
+	this.setIsIndexing( true );
 	this.sendIndexRequest();
 };
 
+/**
+ * Called when a channel's socket has been connected
+ */
 Channel.prototype.onConnect = function() {
 	var init = {
-		name: this.bucket.name,
+		name: this.name,
 		clientid: this.session_id,
 		api: '1.1',
 		token: this.access_token,
@@ -411,18 +601,13 @@ Channel.prototype.onConnect = function() {
 };
 
 Channel.prototype.onIndex = function( data ) {
-	var page = JSON.parse( data ),
+	const page = JSON.parse( data ),
 		objects = page.index,
 		mark		= page.mark,
 		cv			= page.current,
 		update	= internal.updateObjectVersion.bind( this );
 
-	if ( !mark ) {
-		// Let the bucket know straight away that indexing has finished
-		this.bucket.isIndexing = false;
-	}
-
-	var objectId;
+	let objectId;
 	objects.forEach( function( object ) {
 		objectId = object.id;
 		update( object.id, object.v, object.d );
@@ -473,7 +658,7 @@ Channel.prototype.onVersion = function( data ) {
 		return;
 	}
 
-	var ghost = parseVersionMessage( data );
+	const ghost = parseVersionMessage( data );
 
 	this.emit( 'version', ghost.id, ghost.version, ghost.data );
 	this.emit( 'version.' + ghost.id, ghost.id, ghost.version, ghost.data );
@@ -581,7 +766,7 @@ LocalQueue.prototype.queue = function( change ) {
 };
 
 LocalQueue.prototype.hasChanges = function() {
-	return Object.keys(this.queues).length > 0;
+	return Object.keys( this.queues ).length > 0;
 };
 
 LocalQueue.prototype.dequeueChangesFor = function( id ) {
@@ -734,7 +919,8 @@ function collectionRevisions( channel, id, callback ) {
 		// if we have every possible revision already, finish it!
 		// this bypasses any mandatory delay
 		if ( versions.length === latestVersion ) {
-			return finish();
+			finish();
+			return;
 		}
 
 		fetchNextVersion( version );
