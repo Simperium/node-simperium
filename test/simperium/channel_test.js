@@ -326,7 +326,7 @@ describe( 'Channel', function() {
 
 		// If receiving a remote change while there are unsent local modifications,
 		// local changes should be rebased onto the new ghost and re-sent
-		it( 'should resolve applying patch to modified object', () => new Promise( ( resolve ) => {
+		it( 'should resolve applying patch to modified object', () => new Promise( ( resolve, reject ) => {
 			// add an item to the index
 			const key = 'hello',
 				current = { title: 'Hello world' },
@@ -341,9 +341,25 @@ describe( 'Channel', function() {
 				equal( data.title, 'Goodbye kansas' );
 			} );
 
+			// the next change to be sent should be a diff that
+			// changes "Hello kansas" to "Goodbye kansas"
 			channel.on( 'send', function() {
-				equal( channel.localQueue.sent[key].v.title.v, '-5\t+Goodbye\t=6' );
-				resolve();
+				bucket.get( key ).then( ( bucketObject ) => {
+					try {
+						// bucket object is the result of rebasing local modifications
+						// on top of the network changes
+						deepEqual( bucketObject, { title: 'Goodbye kansas' } );
+						// the channel will send the diff that results from the rebased
+						// object and the latest ghost
+						deepEqual(
+							channel.localQueue.sent[key].v,
+							diff( { title: 'Hello kansas' }, bucketObject )
+						);
+					} catch ( error ) {
+						reject( error );
+					}
+					resolve();
+				}, reject )
 			} );
 
 			// We receive a remote change from "Hello world" to "Hello kansas"
@@ -354,7 +370,6 @@ describe( 'Channel', function() {
 			// We're changing "Hello world" to "Goodbye world"
 			bucket.update( key, {title: 'Goodbye world'} );
 		} ) );
-
 
 		/**
 		 * This test simulates a case where an application updates an object locally but quits

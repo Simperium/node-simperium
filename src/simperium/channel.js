@@ -128,29 +128,30 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 	// If it's not an ack, it's a change initiated on a different client
 	// we need to provide a way for the current client to respond to
 	// a potential conflict if it has modifications that have not been synced
+	return this.onBeforeNetworkChange( id, data, original, patch ).then( () => {
+		// pull all pending changes in the local queue for the object of id
+		const changes = this.localQueue.dequeueChangesFor( id ),
+			// change the list of changes into a single change
+			localModifications = change_util.compressChanges( changes, original ),
+			// rebases the local changes on top of the network patch
+			transformed = change_util.transform( localModifications, patch, original );
 
-	// pull all pending changes in the local queue for the object of id
-	const changes = this.localQueue.dequeueChangesFor( id ),
-		// change the list of changes into a single change
-		localModifications = change_util.compressChanges( changes, original ),
-		// rebases the local changes on top of the network patch
-		transformed = change_util.transform( localModifications, patch, original );
+		let update = data;
 
-	let update = data;
+		// if the rebase operation results in a modified object
+		// generate a new patch and queue it to be sent to simperium
+		if ( transformed ) {
+			const patch = transformed,
+				change = change_util.modify( id, version, patch );
 
-	// if the rebase operation results in a modified object
-	// generate a new patch and queue it to be sent to simperium
-	if ( transformed ) {
-		const patch = transformed,
-			change = change_util.modify( id, version, patch );
+			update = jsondiff.apply_object_diff( data, transformed );
+			// queue up the new change
+			this.localQueue.queue( change );
+		}
 
-		update = jsondiff.apply_object_diff( data, transformed );
-		// queue up the new change
-		this.localQueue.queue( change );
-	}
-
-	return save().then( () => {
-		this.emit( 'update', id, update, original, patch, this.isIndexing );
+		return save().then( () => {
+			this.emit( 'update', id, update, original, patch, this.isIndexing );
+		} );
 	} );
 };
 
@@ -500,6 +501,10 @@ Channel.prototype.getVersion = function( id ) {
 		return 0;
 	} );
 }
+
+Channel.prototype.onBeforeNetworkChange = function() {
+	return Promise.resolve();
+};
 
 /**
  * Receives incoming messages from Simperium
