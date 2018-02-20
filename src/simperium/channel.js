@@ -104,42 +104,54 @@ internal.removeAndSend = function( id ) {
 	return this.store.get( id ).then( remove );
 };
 
-// We've receive a full object from the network. Update the local instance and
-// notify of the new object version
+/**
+ * Updates the ghost store with the updated ghost data based on the data that
+ * comes from applying the patch to the original.
+ * 
+ * @param { string } id - the bucket object key for the object being updated
+ * @param { number } version - the version number the ghost is being updated to
+ * @param { Object } data - the new data for the ghost for this version
+ * @param { Object } original - the original data for the ghost before patch is applied
+ * @param { Object } patch - the patch applied to the original to get the resulting data
+ * @param { Object } [acknowledged ] - the change sent by this client matching the received network change
+ * @returns { Promise<*> } resolves once the ghost has been updated
+ */
 internal.updateObjectVersion = function( id, version, data, original, patch, acknowledged ) {
-	var notify,
-		changes,
-		change,
-		patch,
-		localModifications,
-		remoteModifications,
-		transformed,
-		update;
+	const save = () => this.store.put( id, version, data );
+
+	if ( acknowledged ) {
+		return save().then( () => {
+			internal.updateAcknowledged.call( this, acknowledged );
+		} );
+	}
+
 	// If it's not an ack, it's a change initiated on a different client
 	// we need to provide a way for the current client to respond to
 	// a potential conflict if it has modifications that have not been synced
-	if ( !acknowledged ) {
-		changes = this.localQueue.dequeueChangesFor( id );
-		localModifications = change_util.compressChanges( changes, original );
-		remoteModifications = patch;
-		transformed = change_util.transform( localModifications, remoteModifications, original );
-		update = data;
 
-		// apply the transformed patch and emit the update
-		if ( transformed ) {
-			patch = transformed;
-			update = jsondiff.apply_object_diff( data, transformed );
-			// queue up the new change
+	// pull all pending changes in the local queue for the object of id
+	const changes = this.localQueue.dequeueChangesFor( id ),
+		// change the list of changes into a single change
+		localModifications = change_util.compressChanges( changes, original ),
+		// rebases the local changes on top of the network patch
+		transformed = change_util.transform( localModifications, patch, original );
+
+	let update = data;
+
+	// if the rebase operation results in a modified object
+	// generate a new patch and queue it to be sent to simperium
+	if ( transformed ) {
+		const patch = transformed,
 			change = change_util.modify( id, version, patch );
-			this.localQueue.queue( change );
-		}
 
-		notify = this.emit.bind( this, 'update', id, update, original, patch, this.isIndexing );
-	} else {
-		notify = internal.updateAcknowledged.bind( this, acknowledged );
+		update = jsondiff.apply_object_diff( data, transformed );
+		// queue up the new change
+		this.localQueue.queue( change );
 	}
 
-	return this.store.put( id, version, data ).then( notify );
+	return save().then( () => {
+		this.emit( 'update', id, update, original, patch, this.isIndexing );
+	} );
 };
 
 internal.removeObject = function( id, acknowledged ) {
