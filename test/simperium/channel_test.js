@@ -355,6 +355,57 @@ describe( 'Channel', function() {
 			bucket.update( key, {title: 'Goodbye world'} );
 		} ) );
 
+
+		/**
+		 * This test simulates a case where an application updates an object locally but quits
+		 * before it can send the change to simperium. This could happen when an object is modified
+		 * while the application does not have a network connection.
+		 *
+		 * If the same object is modified elsewhere, the application will receive a network change
+		 * and update it's ghost for the object. However, becaus the Channel's localQueue of changes
+		 * is in-memory only, the library will not merge the changes from when the bucket object
+		 * was updated while offline.
+		 *
+		 * In this state, if the application updates that object, it will overwrite the the network
+		 * changes completely because it will use the updated ghost as its new base for diffing.
+		 */
+		it( 'should merge network changes to a locally modified object', () => new Promise( ( resolve, reject ) => {
+			// add an item to the index
+			const key = 'hello',
+				current = { title: 'Hello world' },
+				remoteDiff = diff( current, { title: 'Hello kansas'} );
+
+			store.index[key] = JSON.stringify( { version: 1, data: current } );
+
+			// when the channel is updated, it should be the result of
+			// the local changes being rebased on top of changes coming from the
+			// network which should ultimately be "Goodbye kansas"
+			channel.on( 'update', function( key, data ) {
+				try {
+					equal( data.title, 'Goodbye kansas' );
+				} catch ( error ) {
+					reject( error );
+				}
+				resolve();
+			} );
+
+			channel.on( 'send', function() {
+				// delete the contents of the localQueue to simulate the application
+				// quiting and returning with an empty queue
+				channel.localQueue.queues = {}
+				// delete the sent changes that the queue is waiting for
+				channel.localQueue.sent = {};
+
+				// We receive a remote change from "Hello world" to "Hello kansas"
+				channel.handleMessage( 'c:' + JSON.stringify( [{
+					o: 'M', ev: 2, sv: 1, cv: 'cv1', id: key, v: remoteDiff
+				} ] ) );
+			} );
+
+			// We're changing "Hello world" to "Goodbye world"
+			bucket.update( key, {title: 'Goodbye world'} );
+		} ) );
+
 		it( 'should emit errors on the bucket instance', ( done ) => {
 			const error = {error: 404, id: 'thing', ccids: ['abc']}
 			bucket.on( 'error', ( e ) => {
