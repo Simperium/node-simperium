@@ -7,7 +7,12 @@ BucketStore.prototype.get = function( id, callback ) {
 	var objects = this.objects;
 
 	setImmediate( function() {
-		callback( null, objects[id] );
+		const data = objects[id];
+		if ( data ) {
+			callback( null, { id, data } );
+			return;
+		}
+		callback( null, null );
 	} );
 };
 

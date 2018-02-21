@@ -196,7 +196,37 @@ Bucket.prototype.setChannel = function( channel ) {
 		.on( 'update', this.onChannelUpdate )
 		.on( 'indexingStateChange', this.onChannelIndexingStateChange )
 		.on( 'remove', this.onChannelRemove );
+
+	// Sets up a default network change subscriber that triggers a channel
+	// change operation. This will queue up any changes that exist that
+	// may have not been added to the local queue yet
+	channel.subscribe( ( id ) => this.get( id ).then( object => {
+		if ( ! object ) {
+			return null;
+		}
+		return object.data;
+	} ) );
 };
+
+/**
+ * @callback NetworkChangeSubscribe
+ * @param { string } key - bucket object being changed
+ * @param { Object } data - the new object data
+ * @param { Object } base - the object data before the patch is applied
+ * @param { Object } patch - the patch used to bring base to data
+ * @returns { Promise<*> } - resolve when network change should be applied
+ */
+
+/**
+ * Subscribe to changes to this bucket that are coming from simperium that
+ * did not originate on this client. Can be used to save an object before
+ * network changes are applied.
+ *
+ * @param {NetworkChangeSubcriber} subscriber - callback executed when network changes for this bucket are going to be applied
+ */
+Bucket.prototype.subscribe = function( subscriber ) {
+	this.subscriber = subscriber;
+}
 
 /**
  * Reloads all the data from the currently cached set of ghost data
@@ -251,8 +281,10 @@ Bucket.prototype.update = function( id, data, options, callback ) {
 
 	const task = this.storeAPI.update( id, data, this.isIndexing )
 		.then( bucketObject => {
+			return this.channel.update( bucketObject, options.sync );
+		} )
+		.then( bucketObject => {
 			this.emit( 'update', id, bucketObject.data );
-			this.channel.update( bucketObject, options.sync );
 			return bucketObject;
 		} );
 	return deprecateCallback( callback, task );
@@ -299,11 +331,15 @@ Bucket.prototype.getVersion = function( id, callback ) {
  *
  * @param {String} id - object to sync
  * @param {?bucketStoreGetCallback} callback - optional callback
- * @returns {Promise<Object>} - object id, data
+ * @returns {Promise<BucketObject>} - object id, data
  */
 Bucket.prototype.touch = function( id, callback ) {
 	const task = this.storeAPI.get( id )
-		.then( object => this.update( object.id, object.data ) );
+		.then( object => {
+			if ( object ) {
+				return this.update( object.id, object.data );
+			}
+		} );
 
 	return deprecateCallback( callback, task );
 };

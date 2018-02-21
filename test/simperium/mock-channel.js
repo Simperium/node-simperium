@@ -1,8 +1,8 @@
 import { EventEmitter } from 'events';
 
 export class MockChannel extends EventEmitter {
-	update() {
-		// noop
+	update( object ) {
+		return Promise.resolve( object );
 	}
 
 	getVersion() {
@@ -10,5 +10,9 @@ export class MockChannel extends EventEmitter {
 	}
 
 	remove() {
+	}
+
+	subscribe() {
+		// noop
 	}
 };

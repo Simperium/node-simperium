@@ -19,7 +19,7 @@ describe( 'Bucket', () => {
 		};
 
 		bucket.get( 'hello', ( e, found ) => {
-			deepEqual( found, object );
+			deepEqual( found.data, object );
 			done();
 		} );
 	} );
@@ -31,7 +31,7 @@ describe( 'Bucket', () => {
 		};
 
 		return bucket.get( 'hello' ).then( found => {
-			deepEqual( found, object );
+			deepEqual( found.data, object );
 		} );
 	} );
 
@@ -41,7 +41,7 @@ describe( 'Bucket', () => {
 
 		bucket.update( id, object, function() {
 			bucket.get( id, function( err, savedObject ) {
-				deepEqual( object, savedObject );
+				deepEqual( savedObject.data, object );
 				done();
 			} );
 		} );
@@ -53,7 +53,7 @@ describe( 'Bucket', () => {
 
 		bucket.update( id, object, {}, function() {
 			bucket.get( id, function( err, savedObject ) {
-				deepEqual( object, savedObject );
+				deepEqual( savedObject.data, object );
 				done();
 			} )
 		} )

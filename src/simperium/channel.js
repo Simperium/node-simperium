@@ -13,8 +13,8 @@ const CODE_EMPTY_RESPONSE = 412;
 const CODE_INVALID_DIFF = 440;
 
 const operation = {
-	MODIFY: 'M',
-	REMOVE: '-'
+	MODIFY: change_util.type.MODIFY,
+	REMOVE: change_util.type.REMOVE
 };
 
 // internal methods used as instance methods on a Channel instance
@@ -44,7 +44,6 @@ internal.updateChangeVersion = function( cv ) {
 internal.changeObject = function( id, change ) {
 	// pull out the object from the store and apply the change delta
 	var applyChange = internal.performChange.bind( this, change );
-
 	this.networkQueue.queueFor( id ).add( function( done ) {
 		return applyChange().then( done, done );
 	} );
@@ -124,35 +123,36 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 			internal.updateAcknowledged.call( this, acknowledged );
 		} );
 	}
-
 	// If it's not an ack, it's a change initiated on a different client
 	// we need to provide a way for the current client to respond to
 	// a potential conflict if it has modifications that have not been synced
-	return this.onBeforeNetworkChange( id, data, original, patch ).then( () => {
-		// pull all pending changes in the local queue for the object of id
-		const changes = this.localQueue.dequeueChangesFor( id ),
-			// change the list of changes into a single change
-			localModifications = change_util.compressChanges( changes, original ),
-			// rebases the local changes on top of the network patch
-			transformed = change_util.transform( localModifications, patch, original );
+	return this.onBeforeNetworkChange( id, data, original, patch )
+		.then( ( local ) => {
+			// pull all pending changes in the local queue for the object of id
+			const localModifications = change_util.diff( original, local ),
+				// rebases the local changes on top of the network patch
+				transformed = change_util.transform( localModifications, patch, original );
 
-		let update = data;
+			// remove pending changes
+			this.localQueue.dequeueChangesFor( id );
 
-		// if the rebase operation results in a modified object
-		// generate a new patch and queue it to be sent to simperium
-		if ( transformed ) {
-			const patch = transformed,
-				change = change_util.modify( id, version, patch );
+			let update = data;
 
-			update = jsondiff.apply_object_diff( data, transformed );
-			// queue up the new change
-			this.localQueue.queue( change );
-		}
+			// if the rebase operation results in a modified object
+			// generate a new patch and queue it to be sent to simperium
+			if ( transformed ) {
+				const patch = transformed,
+					change = change_util.modify( id, version, patch );
 
-		return save().then( () => {
-			this.emit( 'update', id, update, original, patch, this.isIndexing );
-		} );
-	} );
+				update = jsondiff.apply_object_diff( data, transformed );
+				// queue up the new change
+				this.localQueue.queue( change );
+			}
+
+			return save().then( () => {
+				this.emit( 'update', id, update, original, patch, this.isIndexing );
+			} );
+		}, console.error.bind( console, 'wtf2' ) );
 };
 
 internal.removeObject = function( id, acknowledged ) {
@@ -198,7 +198,7 @@ internal.requestObjectVersion = function( id, version ) {
 };
 
 internal.applyChange = function( change, ghost ) {
-	const acknowledged = internal.findAcknowledgedChange.bind( this )( change ),
+	const acknowledged = internal.findAcknowledgedChange.call( this, change ),
 		updateChangeVersion = internal.updateChangeVersion.bind( this, change.cv );
 
 	let error,
@@ -427,12 +427,16 @@ inherits( Channel, EventEmitter );
  *
  * @param {BucketObject} object - the bucket object
  * @param {Boolean} [sync=true] - if the object should be synced
+ * @returns {Promise<BucketObject>} the bucket object
  */
 Channel.prototype.update = function( object, sync = true ) {
 	this.onBucketUpdate( object.id );
 	if ( sync === true ) {
-		internal.diffAndSend.call( this, object.id, object.data );
+		return internal
+			.diffAndSend.call( this, object.id, object.data )
+			.then( () => object );
 	}
+	return Promise.resolve( object );
 };
 
 /**
@@ -502,7 +506,17 @@ Channel.prototype.getVersion = function( id ) {
 	} );
 }
 
-Channel.prototype.onBeforeNetworkChange = function() {
+/**
+ * Subscription interface for network changes.
+ */
+Channel.prototype.subscribe = function( subscriber ) {
+	this.subscriber = subscriber;
+};
+
+Channel.prototype.onBeforeNetworkChange = function( id, data, base, patch ) {
+	if ( this.subscriber ) {
+		return Promise.resolve( this.subscriber( id, data, base, patch ) );
+	}
 	return Promise.resolve();
 };
 

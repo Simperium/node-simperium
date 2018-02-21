@@ -66,10 +66,10 @@ describe( 'Channel', function() {
 				equal( data.content, 'hola mundo' );
 				done();
 			} );
+			channel.handleMessage( util.format( 'c:%s', JSON.stringify( changes ) ) );
 		} );
 
 		channel.handleMessage( util.format( 'i:%s', JSON.stringify( {index: [{v: version, id: id, d: data}]} ) ) );
-		channel.handleMessage( util.format( 'c:%s', JSON.stringify( changes ) ) );
 	} );
 
 	it( 'should queue multiple changes', function( done ) {
@@ -243,7 +243,7 @@ describe( 'Channel', function() {
 			return new Promise( ( resolve ) => {
 				bucket.on( 'update', () => {
 					bucket.get( 'object' ).then( ( object ) => {
-						equal( object.content, 'step 1' );
+						equal( object.data.content, 'step 1' );
 						resolve();
 					} );
 				} );
@@ -334,41 +334,37 @@ describe( 'Channel', function() {
 
 			store.index[key] = JSON.stringify( { version: 1, data: current } );
 
-			// when the channel is updated, it should be the result of
-			// the local changes being rebased on top of changes coming from the
-			// network which should ultimately be "Goodbye kansas"
-			channel.on( 'update', function( key, data ) {
-				equal( data.title, 'Goodbye kansas' );
+			// the first send is the attempt to change Hello world to Goodbye world
+			channel.once( 'send', ( data ) => {
+				// a network change has been received, now we're going to send
+				// the rebased diff
+				channel.once( 'send', () => {
+					bucket.get( key ).then( ( bucketObject ) => {
+						try {
+							// bucket object is the result of rebasing local modifications
+							// on top of the network changes
+							deepEqual( bucketObject.data, { title: 'Goodbye kansas' } );
+							// the channel will send the diff that results from the rebased
+							// object and the latest ghost
+							deepEqual(
+								channel.localQueue.sent[key].v,
+								diff( { title: 'Hello kansas' }, { title: 'Goodbye kansas' } )
+							);
+						} catch ( error ) {
+							reject( error );
+						}
+						resolve();
+					} )
+				} )
+				// We receive a remote change from "Hello world" to "Hello kansas"
+				channel.handleMessage( 'c:' + JSON.stringify( [{
+					o: 'M', ev: 2, sv: 1, cv: 'cv1', id: key, v: remoteDiff
+				}] ) );
 			} );
-
-			// the next change to be sent should be a diff that
-			// changes "Hello kansas" to "Goodbye kansas"
-			channel.on( 'send', function() {
-				bucket.get( key ).then( ( bucketObject ) => {
-					try {
-						// bucket object is the result of rebasing local modifications
-						// on top of the network changes
-						deepEqual( bucketObject, { title: 'Goodbye kansas' } );
-						// the channel will send the diff that results from the rebased
-						// object and the latest ghost
-						deepEqual(
-							channel.localQueue.sent[key].v,
-							diff( { title: 'Hello kansas' }, bucketObject )
-						);
-					} catch ( error ) {
-						reject( error );
-					}
-					resolve();
-				}, reject )
-			} );
-
-			// We receive a remote change from "Hello world" to "Hello kansas"
-			channel.handleMessage( 'c:' + JSON.stringify( [{
-				o: 'M', ev: 2, sv: 1, cv: 'cv1', id: key, v: remoteDiff
-			}] ) );
 
 			// We're changing "Hello world" to "Goodbye world"
 			bucket.update( key, {title: 'Goodbye world'} );
+
 		} ) );
 
 		/**
@@ -404,7 +400,7 @@ describe( 'Channel', function() {
 				resolve();
 			} );
 
-			channel.on( 'send', function() {
+			channel.once( 'send', function() {
 				// delete the contents of the localQueue to simulate the application
 				// quiting and returning with an empty queue
 				channel.localQueue.queues = {}
