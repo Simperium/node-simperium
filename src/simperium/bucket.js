@@ -240,7 +240,7 @@ Bucket.prototype.setChannel = function( channel ) {
  * @param { Object } data - the new object data
  * @param { Object } base - the object data before the patch is applied
  * @param { Object } patch - the patch used to bring base to data
- * @returns { Promise<Object|null> } - resolve when network change should be applied
+ * @returns { Object | null | Promise<Object | null> } - resolve when network change should be applied
  */
 
 /**
