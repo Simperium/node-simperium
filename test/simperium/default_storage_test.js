@@ -1,35 +1,34 @@
-import assert from 'assert'
+import { deepEqual } from 'assert'
 import Bucket from '../../src/simperium/bucket'
 import defaultStore from '../../src/simperium/storage/default'
+import { MockChannel } from './mock-channel';
 
-describe( 'default store', function() {
-	var bucket;
+describe( 'default store', () => {
+	let bucket;
 
-	beforeEach( function() {
-		bucket = new Bucket( 'things', defaultStore );
+	beforeEach( () => {
+		bucket = new Bucket( 'things', defaultStore, new MockChannel() );
 	} )
 
-	it( 'should store object update', function( done ) {
-		var id = 'thing',
+	it( 'should store object update', () => {
+		const id = 'thing',
 			data = {one: 'two'};
 
-		bucket.update( id, data, function() {
-			bucket.get( id, function( err, object ) {
-				assert.deepEqual( object, { data, id } );
-				done();
+		return bucket.update( id, data )
+			.then( () => bucket.get( id ) )
+			.then( ( object ) => {
+				deepEqual( object, { data, id } );
 			} );
-		} );
 	} );
 
-	it( 'should update with options', function( done ) {
-		var id = 'thing',
+	it( 'should update with options', () => {
+		const id = 'thing',
 			data = {one: 'two'}
 
-		bucket.update( id, data, {}, function() {
-			bucket.get( id, function( err, object ) {
-				assert.deepEqual( object, { data, id } );
-				done();
-			} )
-		} )
+		return bucket.update( id, data )
+			.then( () => bucket.get( id ) )
+			.then( ( object ) => {
+				deepEqual( object, { data, id } );
+			} );
 	} );
-} )
+} );

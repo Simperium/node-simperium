@@ -9,13 +9,13 @@
   },
   "scripts": {
     "flow": "flow",
-    "test": "mocha --compilers js:babel-core/register test/**",
+    "test": "mocha --compilers js:babel-core/register --require test/helper test/**",
     "prepublish": "babel -q -d lib/ src/"
   },
   "author": "",
   "license": "BSD-2-Clause",
   "dependencies": {
-    "node-uuid": "^1.4.7",
+    "uuid": "^3.2.1",
     "websocket": "^1.0.22"
   },
   "devDependencies": {
