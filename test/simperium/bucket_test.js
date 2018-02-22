@@ -5,10 +5,11 @@ import storeProvider from './mock_bucket_store';
 import { MockChannel } from './mock-channel';
 
 describe( 'Bucket', () => {
-	let bucket, store;
+	let bucket, store, channel;
 
 	beforeEach( function() {
-		bucket = new Bucket( 'things', storeProvider, new MockChannel() );
+		channel = new MockChannel();
+		bucket = new Bucket( 'things', storeProvider, channel );
 		store = bucket.store;
 	} );
 
@@ -80,22 +81,47 @@ describe( 'Bucket', () => {
 		} );
 	} );
 
-	it( 'should fetch object version callback', ( done ) => {
-		store.objects = {
-			thing: { other: 'thing' }
-		};
-		bucket.getVersion( 'thing', ( error, version ) => {
-			equal( version, 0 );
-			done();
-		} );
-	} );
 
-	it( 'should fetch object version promise', () => {
-		store.objects = {
-			thing: { other: 'thing' }
-		};
-		bucket.getVersion( 'thing' ).then( ( version ) => {
-			equal( version, 0 );
+	describe( 'stored objects', () => {
+		beforeEach( () => {
+			store.objects = {
+				thing: { other: 'thing' }
+			};
+		} );
+
+
+		it( 'should fetch object version callback', ( done ) => {
+			bucket.getVersion( 'thing', ( error, version ) => {
+				equal( version, 0 );
+				done();
+			} );
+		} );
+
+		it( 'should fetch object version promise', () => {
+			bucket.getVersion( 'thing' ).then( ( version ) => {
+				equal( version, 0 );
+			} );
+		} );
+
+		it( 'should provide object local state', () => {
+			return channel.subscriber( 'thing' ).then( local => {
+				deepEqual( local, store.objects.thing );
+			} )
+		} );
+
+		it( 'should allow subscriber to provide local state', () => {
+			const expected = { something: 'else' };
+			bucket.subscribe( () => expected );
+			return channel.subscriber( 'thing' ).then( local => {
+				deepEqual( local, expected );
+			} );
+		} )
+
+		it( 'should provide state when subscriber returns null', () => {
+			bucket.subscribe( () => null );
+			return channel.subscriber( 'thing' ).then( local => {
+				deepEqual( local, store.objects.thing );
+			} );
 		} );
 	} );
 } );

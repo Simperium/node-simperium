@@ -197,15 +197,41 @@ Bucket.prototype.setChannel = function( channel ) {
 		.on( 'indexingStateChange', this.onChannelIndexingStateChange )
 		.on( 'remove', this.onChannelRemove );
 
+	/**
+	 * Fetch the current state for a given id in the datastore
+	 *
+	 * @param {string} id - object to fetch current state for
+	 * @returns {Promise<Object|null>} local state or null if no state to provide
+	 */
+	const localStateForKey = ( id ) => {
+		return this.get( id ).then( ( object ) => {
+			if ( object ) {
+				return object.data;
+			}
+		} );
+	}
+
 	// Sets up a default network change subscriber that triggers a channel
 	// change operation. This will queue up any changes that exist that
 	// may have not been added to the local queue yet
-	channel.subscribe( ( id ) => this.get( id ).then( object => {
-		if ( ! object ) {
-			return null;
-		}
-		return object.data;
-	} ) );
+	channel.subscribe( ( id, ... args ) => {
+		const subscriber = this.subscriber
+			// if there is a subcriber, let it handle the network change
+			? Promise.resolve( this.subscriber( id, ... args ) )
+			// if no subscriber, resolving null will mean we should handle it
+			: Promise.resolve( null );
+
+		return subscriber
+			.then( localState => {
+				// if subscriber provided local state of any truthy type use that
+				// as the object's local state
+				if ( localState ) {
+					return localState;
+				}
+				// Subscriber did not provide local state, fetch it from the datastore
+				return localStateForKey( id );
+			} )
+	} );
 };
 
 /**
@@ -214,7 +240,7 @@ Bucket.prototype.setChannel = function( channel ) {
  * @param { Object } data - the new object data
  * @param { Object } base - the object data before the patch is applied
  * @param { Object } patch - the patch used to bring base to data
- * @returns { Promise<*> } - resolve when network change should be applied
+ * @returns { Promise<Object|null> } - resolve when network change should be applied
  */
 
 /**

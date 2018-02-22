@@ -12,7 +12,7 @@ export class MockChannel extends EventEmitter {
 	remove() {
 	}
 
-	subscribe() {
-		// noop
+	subscribe( subscriber ) {
+		this.subscriber = subscriber;
 	}
 };
