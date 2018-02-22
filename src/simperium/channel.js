@@ -1,16 +1,62 @@
+// @flow
 /*eslint no-shadow: 0*/
 import { format, inherits } from 'util'
-import { EventEmitter } from 'events'
+import events from 'events'
 import { parseMessage, parseVersionMessage, change as change_util } from './util'
 import JSONDiff from './jsondiff'
 import { v4 as uuid } from 'uuid'
 
+const { EventEmitter } = events;
+
 const jsondiff = new JSONDiff( {list_diff: false} );
+
+type LocalChange = {
+	id: string,
+	ccid: string
+}
+
+type NetworkChange = {
+	id: string,
+	ccids: string[],
+	o: '+' | '-' | 'M',
+	sv: number,
+	ev: number,
+	cv: string,
+	v?: {}
+}
+
+type NetworkChangeErrorResponse = {
+	error: number,
+	id: string,
+	ccids: string[],
+	d: ?{},
+	hasSentFullObject?: boolean
+};
+
+type Ghost = {
+	key: string,
+	version: number,
+	data: {}
+}
+
+class ChangeError extends Error {
+	code: number;
+	changeError: NetworkChangeErrorResponse;
+	change: ?LocalChange;
+
+	constructor( changeError: NetworkChangeErrorResponse, localChange: ?LocalChange ) {
+		super( `${changeError.error} - Could not apply change to: ${changeError.id}` );
+		this.code = changeError.error;
+		this.changeError = changeError;
+		this.change = localChange;
+	}
+}
 
 const UNKNOWN_CV = '?';
 const CODE_INVALID_VERSION = 405;
 const CODE_EMPTY_RESPONSE = 412;
 const CODE_INVALID_DIFF = 440;
+const CODE_DUPLICATE_CHANGE = 409;
 
 const operation = {
 	MODIFY: 'M',
@@ -41,7 +87,7 @@ internal.updateChangeVersion = function( cv ) {
  * @param {String} id - id of the object changed
  * @param {Object} change - the change to apply to the object
  */
-internal.changeObject = function( id, change ) {
+internal.changeObject = function( id: string, change: NetworkChange ) {
 	// pull out the object from the store and apply the change delta
 	var applyChange = internal.performChange.bind( this, change );
 
@@ -153,7 +199,7 @@ internal.removeObject = function( id, acknowledged ) {
 	return this.store.remove( id ).then( notify );
 };
 
-internal.updateAcknowledged = function( change ) {
+internal.updateAcknowledged = function( change: LocalChange ) {
 	var id = change.id;
 	if ( this.localQueue.sent[id] === change ) {
 		this.localQueue.acknowledge( change );
@@ -166,7 +212,7 @@ internal.performChange = function( change ) {
 	return this.store.get( change.id ).then( success );
 };
 
-internal.findAcknowledgedChange = function( change ) {
+internal.findAcknowledgedChange = function( change: { id: string, ccids: string[] } ) {
 	var possibleChange = this.localQueue.sent[change.id];
 	if ( possibleChange ) {
 		if ( ( change.ccids || [] ).indexOf( possibleChange.ccid ) > -1 ) {
@@ -184,12 +230,21 @@ internal.requestObjectVersion = function( id, version ) {
 	} );
 };
 
-internal.applyChange = function( change, ghost ) {
-	const acknowledged = internal.findAcknowledgedChange.bind( this )( change ),
+const applyChangeError = ( channel: Channel, changeError: NetworkChangeErrorResponse ) => {
+	// run on network queue for the relevant bucket object
+	channel.networkQueue.queueFor( changeError.id ).add( ( done ) => {
+		const localChange = internal.findAcknowledgedChange.call( channel, changeError );
+		const error = new ChangeError( changeError, localChange );
+		internal.handleChangeError.call( channel, error, changeError, localChange );
+		done();
+	} )
+};
+
+internal.applyChange = function( change: NetworkChange, ghost: Ghost ) {
+	const acknowledged = internal.findAcknowledgedChange.call( this, change ),
 		updateChangeVersion = internal.updateChangeVersion.bind( this, change.cv );
 
-	let error,
-		original,
+	let original,
 		patch,
 		modified;
 	// attempt to apply the change
@@ -199,19 +254,13 @@ internal.applyChange = function( change, ghost ) {
 	//	 id: '9e9a9616-8174-425a-a1b0-9ed5410f1edc',
 	//	 clientid: 'node-b9776e96-c068-42ae-893a-03f50833bddb',
 	//	 error: 400 }
-	if ( change.error ) {
-		error = new Error( `${change.error} - Could not apply change to: ${ghost.key}` );
-		error.code = change.error;
-		error.change = change;
-		error.ghost = ghost;
-		internal.handleChangeError.call( this, error, change, acknowledged );
-		return;
-	}
 
 	if ( change.o === operation.MODIFY ) {
-		if ( ghost && ( ghost.version !== change.sv ) ) {
+		const matchesStartingVersion = change.sv === ghost.version ||
+			( change.sv === 0 && ( ghost.version === null || ghost.version === undefined ) );
+		if ( ! matchesStartingVersion ) {
 			internal.requestObjectVersion.call( this, change.id, change.sv ).then( data => {
-				internal.applyChange.call( this, change, { version: change.sv, data } )
+				internal.applyChange.call( this, change, { key: ghost.key, version: change.sv, data } )
 			} );
 			return;
 		}
@@ -226,8 +275,12 @@ internal.applyChange = function( change, ghost ) {
 	}
 }
 
-internal.handleChangeError = function( err, change, acknowledged ) {
+internal.handleChangeError = function( err: ChangeError, change: NetworkChangeErrorResponse, acknowledged: ?LocalChange ) {
 	switch ( err.code ) {
+		case CODE_DUPLICATE_CHANGE:
+			if ( ! acknowledged ) {
+				break;
+			}
 		case CODE_INVALID_VERSION:
 		case CODE_INVALID_DIFF: // Invalid version or diff, send full object back to server
 			if ( ! change.hasSentFullObject ) {
@@ -242,7 +295,9 @@ internal.handleChangeError = function( err, change, acknowledged ) {
 
 			break;
 		case CODE_EMPTY_RESPONSE: // Change causes no change, just acknowledge it
-			internal.updateAcknowledged.call( this, acknowledged );
+			if ( acknowledged ) {
+				internal.updateAcknowledged.call( this, acknowledged );
+			}
 			break;
 		default:
 			this.emit( 'error', err, change );
@@ -291,7 +346,7 @@ internal.indexingComplete = function() {
  *
  * @interface GhostStore
  */
-
+interface GhostStore {
 /**
  * Retrieve a Ghost for the given bucket object id
  *
@@ -344,7 +399,7 @@ internal.indexingComplete = function() {
  * @name GhostStore#setChangeVersion
  * @returns {Promise<Void>} - resolves once the change version is saved
  */
-
+}
 
 /**
  * Maintains syncing state for a Simperium bucket.
@@ -364,7 +419,7 @@ internal.indexingComplete = function() {
  * @param {GhostStore} store - data storage for ghost objects
  * @param {String} name - the name of the bucket on Simperium.com
  */
-export default function Channel( appid, access_token, store, name ) {
+export default function Channel( appid: string, access_token: string, store: GhostStore, name: string ) {
 	// Uses an event emitter to handle different Simperium  commands
 	const message = this.message = new EventEmitter();
 
@@ -634,12 +689,63 @@ Channel.prototype.sendChangeVersionRequest = function( cv ) {
 	this.send( format( 'cv:%s', cv ) );
 };
 
+
+type ChangeMessage = {
+	clientid?: string,
+	ccids?: string[],
+	id?: string, // Bucket object being changed
+	o?: string, // TODO: force into valid operation types,
+	v?: {}, // TODO: force into valid change value
+	cv?: string, // Bucket cv this change represents
+	sv?: number,
+	ev?: number,
+	error?: number,
+	d?: {}
+};
+
+const requireProp = <T>( key: string, object: {} ): T => {
+	const value = object[ key ];
+	if ( value ) {
+		return value;
+	}
+	throw new Error( `unexpected value ${ value } for key ${ key } in ${ JSON.stringify( object ) }` );
+}
+
+const asNetworkErrorResponse = ( changeMessage: ChangeMessage ): NetworkChangeErrorResponse => {
+	return {
+		id: requireProp( 'id', changeMessage ),
+		d: changeMessage.d,
+		ccids: requireProp( 'ccids', changeMessage ),
+		error: requireProp( 'error', changeMessage )
+	};
+}
+
+const asNetworkChange = ( changeMessage: ChangeMessage ): NetworkChange => {
+	return {
+		id: requireProp( 'id', changeMessage ),
+		ccids: requireProp( 'ccids', changeMessage ),
+		o: requireProp( 'o', changeMessage ),
+		d: changeMessage.id,
+		cv: requireProp( 'cv', changeMessage ),
+		ev: requireProp( 'ev', changeMessage ),
+		sv: changeMessage.sv ? changeMessage.sv : 0,
+		v: changeMessage.v // v not required for `-` change types
+	};
+}
+
 Channel.prototype.onChanges = function( data ) {
 	var changes = JSON.parse( data ),
 		onChange = internal.changeObject.bind( this );
 
-	changes.forEach( function( change ) {
-		onChange( change.id, change );
+	changes.forEach( ( change ) => {
+		// TODO: parsed change _could_ be an error response
+		// error change shape an non-error change shape are _not_ the same
+		// do validation here and choose appropriate code path
+		if ( change.error ) {
+			applyChangeError( this, asNetworkErrorResponse( change ) );
+		} else {
+			onChange( change.id, asNetworkChange( change ) );
+		}
 	} );
 	// emit ready after all server changes have been applied
 	this.emit( 'ready' );
@@ -866,7 +972,7 @@ LocalQueue.prototype.resendSentChanges = function() {
  *
  * @type {Map<String,Object>} stores specific revisions as a cache
  */
-export const revisionCache = new Map();
+export const revisionCache: Map<string,{}> = new Map();
 
 /**
  * Attempts to fetch an entity's revisions
@@ -966,8 +1072,9 @@ function collectionRevisions( channel, id, callback ) {
 		requestedVersions.add( version );
 
 		// fetch from server or local cache
-		if ( revisionCache.has( `${ id }.${ version }` ) ) {
-			onVersion( id, version, revisionCache.get( `${ id }.${ version }` ) );
+		const cached = revisionCache.get( `${ id }.${ version }` );
+		if ( cached ) {
+			onVersion( id, version, cached );
 		} else {
 			channel.send( `e:${ id }.${ version }` );
 		}
