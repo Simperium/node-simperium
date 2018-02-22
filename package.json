@@ -9,6 +9,7 @@
   },
   "scripts": {
     "flow": "flow",
+    "lint": "eslint .",
     "test": "mocha --require babel-core/register --require test/helper test/**",
     "prepublish": "babel -q -d lib/ src/"
   },
