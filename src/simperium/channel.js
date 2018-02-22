@@ -152,7 +152,7 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 			return save().then( () => {
 				this.emit( 'update', id, update, original, patch, this.isIndexing );
 			} );
-		}, console.error.bind( console, 'wtf2' ) );
+		} );
 };
 
 internal.removeObject = function( id, acknowledged ) {
