@@ -247,13 +247,6 @@ internal.applyChange = function( change: NetworkChange, ghost: Ghost ) {
 	let original,
 		patch,
 		modified;
-	// attempt to apply the change
-	// TODO: Handle errors as specified in
-	//	 0:c:[{"ccids": ["0435edf4-3f07-4cc6-bf86-f68e6db8779c"], "id": "9e9a9616-8174-42
-	// { ccids: [ '0435edf4-3f07-4cc6-bf86-f68e6db8779c' ],
-	//	 id: '9e9a9616-8174-425a-a1b0-9ed5410f1edc',
-	//	 clientid: 'node-b9776e96-c068-42ae-893a-03f50833bddb',
-	//	 error: 400 }
 
 	if ( change.o === operation.MODIFY ) {
 		const matchesStartingVersion = change.sv === ghost.version ||
@@ -689,14 +682,13 @@ Channel.prototype.sendChangeVersionRequest = function( cv ) {
 	this.send( format( 'cv:%s', cv ) );
 };
 
-
 type ChangeMessage = {
 	clientid?: string,
 	ccids?: string[],
 	id?: string, // Bucket object being changed
-	o?: string, // TODO: force into valid operation types,
-	v?: {}, // TODO: force into valid change value
-	cv?: string, // Bucket cv this change represents
+	o?: string,
+	v?: {},
+	cv?: string,
 	sv?: number,
 	ev?: number,
 	error?: number,
@@ -738,9 +730,6 @@ Channel.prototype.onChanges = function( data ) {
 		onChange = internal.changeObject.bind( this );
 
 	changes.forEach( ( change ) => {
-		// TODO: parsed change _could_ be an error response
-		// error change shape an non-error change shape are _not_ the same
-		// do validation here and choose appropriate code path
 		if ( change.error ) {
 			applyChangeError( this, asNetworkErrorResponse( change ) );
 		} else {
@@ -972,7 +961,7 @@ LocalQueue.prototype.resendSentChanges = function() {
  *
  * @type {Map<String,Object>} stores specific revisions as a cache
  */
-export const revisionCache: Map<string,{}> = new Map();
+export const revisionCache: Map<string, {}> = new Map();
 
 /**
  * Attempts to fetch an entity's revisions
