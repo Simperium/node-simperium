@@ -1,3 +1,4 @@
+// @flow
 import Store from './store'
 
 /**
@@ -6,6 +7,6 @@ import Store from './store'
  * @param {Bucket} a bucket instance to store ghost objects for
  * @returns {GhostStore} an istance of a GhostStore used to save Ghost data
  */
-export default function( bucket ) {
+export default function( bucket: Bucket ) {
 	return new Store( bucket );
 };

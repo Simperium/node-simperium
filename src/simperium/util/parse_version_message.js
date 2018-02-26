@@ -1,4 +1,4 @@
-
+// @flow
 export default function( data ) {
 	var dataMark = data.indexOf( '\n' ),
 		versionMark = data.indexOf( '.' ),

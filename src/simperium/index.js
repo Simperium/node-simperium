@@ -1,3 +1,4 @@
+// @flow
 import Client from './client'
 import Auth from './auth'
 import * as util from './util'

@@ -1,28 +1,38 @@
+// @flow
 
-function BucketStore() {
-	this.objects = {};
+import type { BucketStore, BucketObject } from '../../src/simperium/bucket';
+
+class MockStore implements BucketStore  {
+	objects: { [string]: BucketObject };
+
+	constructor() {
+		this.objects = {};
+	}
+
+	get( id: string, callback: Function ) {
+		var objects = this.objects;
+		setImmediate( function() {
+			callback( null, objects[id] );
+		} );
+	}
+
+	update( id: string, object: {}, isIndexing: boolean, callback: Function ) {
+		setImmediate( () => {
+			let updated = this.objects[id] = {id: id, data: object, isIndexing: isIndexing};
+			if ( callback ) callback( null, updated );
+		} );
+	}
+
+	remove( id: string, callback: Function ) {
+		setImmediate( () => {
+			delete this.objects[id];
+			callback( null );
+		} );
+	}
+
+	find() {
+		throw new Error( 'not implemeted' );
+	}
 }
 
-BucketStore.prototype.get = function( id, callback ) {
-	var objects = this.objects;
-
-	setImmediate( function() {
-		callback( null, objects[id] );
-	} );
-};
-
-BucketStore.prototype.update = function( id, object, isIndexing, callback ) {
-	this.objects[id] = object;
-	setImmediate( function() {
-		if ( callback ) callback( null, {id: id, data: object, isIndexing: isIndexing} );
-	} );
-};
-
-BucketStore.prototype.remove = function( id, callback ) {
-	delete this.objects[id];
-	setImmediate( function() {
-		callback( null );
-	} );
-};
-
-export default () => new BucketStore();
+export default () => new MockStore();
