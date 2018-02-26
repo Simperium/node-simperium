@@ -1,6 +1,7 @@
 {
   "presets": [
-    [ "env", { "targets": { "browsers": "last 2 versions"} }, "flow" ]
+    [ "env", { "targets": { "browsers": "last 2 versions"} } ],
+    "flow"
   ],
   "plugins": [ "transform-object-rest-spread" ]
 }
