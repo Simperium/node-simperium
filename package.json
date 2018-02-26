@@ -20,7 +20,7 @@
   "author": "",
   "license": "BSD-2-Clause",
   "dependencies": {
-    "node-uuid": "^1.4.7",
+    "uuid": "^3.2.1",
     "websocket": "^1.0.22"
   },
   "devDependencies": {

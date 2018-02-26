@@ -40,8 +40,8 @@ auth.on( 'authorize', function( user ) {
 } );
 
 auth.authorize(
-	process.env.SIMPLENOTE_USERNAME,
-	process.env.SIMPLENOTE_PASSWORD
+	process.env.SIMPERIUM_USERNAME,
+	process.env.SIMPERIUM_PASSWORD
 ).then( function( user ) {
 	console.log( 'Logged in', user );
 }, function( error ) {
