@@ -1,3 +1,7 @@
 {
-	"presets": ["es2015", "flow"]
+  "presets": [
+    [ "env", { "targets": { "browsers": "last 2 versions"} } ],
+    "flow"
+  ],
+  "plugins": [ "transform-object-rest-spread" ]
 }

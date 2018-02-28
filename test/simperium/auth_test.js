@@ -1,4 +1,4 @@
-import Auth from '../../src/simperium/auth'
+import buildAuth from '../../src/simperium/auth'
 import https from 'https'
 import { equal, deepEqual } from 'assert'
 import { EventEmitter } from 'events'
@@ -19,11 +19,11 @@ const stubResponse = ( data ) => stub( ( body, handler ) => {
 } )
 
 describe( 'Auth', () => {
-	var auth
+	let auth;
 
 	beforeEach( () => {
-		auth = new Auth( 'token', 'secret' );
-	} )
+		auth = buildAuth( 'token', 'secret' );
+	} );
 
 	it( 'getUrlOptions', () => {
 		const { hostname, headers, pathname, method } = auth.getUrlOptions( 'path' )
@@ -33,7 +33,7 @@ describe( 'Auth', () => {
 		deepEqual( headers, { 'X-Simperium-API-Key': 'secret' } )
 	} )
 
-	it( 'should request auth token', ( done ) => {
+	it( 'should request auth token', () => {
 		stub( ( data, handler ) => {
 			const { username, password } = JSON.parse( data )
 			const response = new EventEmitter()
@@ -45,24 +45,31 @@ describe( 'Auth', () => {
 			response.emit( 'end' );
 		} )
 
-		auth.authorize( 'username', 'password' )
-		.then( ( user ) => {
-			equal( user.access_token, 'secret-token' )
-			done()
-		} )
-	} )
+		return auth.authorize( 'username', 'password' )
+			.then( ( user ) => {
+				equal( user.access_token, 'secret-token' );
+			} );
+	} );
 
-	it( 'should fail to auth with invalid credentials', ( done ) => {
+	it( 'should fail if missing access_token', () => {
+		stubResponse( '{"hello":"world"}' );
+		return auth.authorize( 'username', 'password' )
+			.catch( error => {
+				equal( error.message, 'Failed to authenticate user.' );
+				equal( error.underlyingError.message, 'access_token not present' );
+			} );
+	} );
+
+	it( 'should fail to auth with invalid credentials', () => {
 		stubResponse( 'this is not json' )
 
-		auth.authorize( 'username', 'bad-password' )
-		.catch( ( e ) => {
-			equal( e.message, 'this is not json' )
-			done()
-		} )
+		return auth.authorize( 'username', 'bad-password' )
+			.catch( ( e ) => {
+				equal( e.message, 'Failed to authenticate user.' );
+			} );
 	} )
 
-	it( 'should create an account with valid credentials', ( done ) => {
+	it( 'should create an account with valid credentials', () => {
 		stub( ( data, handler ) => {
 			const { username, password } = JSON.parse( data )
 			const response = new EventEmitter()
@@ -74,20 +81,18 @@ describe( 'Auth', () => {
 			response.emit( 'end' );
 		} )
 
-		auth.create( 'username', 'password' )
-		.then( ( user ) => {
-			equal( user.access_token, 'secret-token' )
-			done()
-		} )
+		return auth.create( 'username', 'password' )
+			.then( user => {
+				equal( user.access_token, 'secret-token' )
+			} );
 	} )
 
-	it( 'should fail to create an account with invalid credentials', ( done ) => {
+	it( 'should fail to create an account with invalid credentials', () => {
 		stubResponse( 'this is not json' )
 
-		auth.create( 'username', 'bad-password' )
-		.catch( ( e ) => {
-			equal( e.message, 'this is not json' )
-			done()
-		} )
+		return auth.create( 'username', 'bad-password' )
+			.catch( ( e ) => {
+				equal( e.message, 'Failed to authenticate user.' );
+			} );
 	} )
 } )
