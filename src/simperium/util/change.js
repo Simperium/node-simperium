@@ -1,10 +1,13 @@
-import { v4 as uuid } from 'uuid'
+// @flow
+import uuid from 'uuid/v4'
 import jsondiff from '../jsondiff'
+import type { ObjectOperationSet } from '../jsondiff';
 
-const changeTypes = {
+export type BucketChangeType = 'M' | '-';
+
+const changeTypes: { [name: string]: BucketChangeType } = {
 	MODIFY: 'M',
-	REMOVE: '-',
-	ADD: '+'
+	REMOVE: '-'
 };
 
 const { object_diff, transform_object_diff, apply_object_diff } = jsondiff( {list_diff: false} )
@@ -17,32 +20,55 @@ export {
 	apply_diff as apply
 }
 
-function modify( id, version, patch ) {
-	return { o: changeTypes.MODIFY, id: id, ccid: uuid.v4(), v: patch };
+function modify( id: string, version: number, patch: {} ) {
+	return { o: changeTypes.MODIFY, id: id, ccid: uuid(), v: patch };
 }
 
-function buildChange( type, id, object, ghost ) {
+function buildChange( type: BucketChangeType, id: string, object: {}, ghost: {| version: number, data: {} |} ) {
 	return buildChangeFromOrigin( type, id, ghost.version, object, ghost.data );
 }
 
-function buildChangeFromOrigin( type, id, version, target, origin ) {
-	var changeData = {
-		o: type,
-		id: id,
-		ccid: uuid.v4()
-	};
-
-	// Remove operations have no source version or diff
-	if ( type === changeTypes.REMOVE ) return changeData;
-
-	if ( version > 0 ) changeData.sv = version;
-
-	changeData.v = object_diff( origin, target );
-
-	return changeData;
+export type ModifyChange = {
+	o: 'M',
+	id: string,
+	ccid: string,
+	v: ObjectOperationSet,
+	sv?: number
 }
 
-function compressChanges( changes, origin ) {
+export type RemoveChange = {
+	o: '-',
+	id: string,
+	ccid: string
+}
+
+export type Change = ModifyChange | RemoveChange;
+
+function buildChangeFromOrigin( type: BucketChangeType, id: string, version: number, target: {}, origin: {} ): Change {
+
+	if ( type === changeTypes.REMOVE ) {
+		return {
+			o: '-',
+			id,
+			ccid: uuid()
+		};
+	}
+
+
+	const change: ModifyChange = {
+		o: 'M',
+		id,
+		ccid: uuid(),
+		v: object_diff( origin, target )
+	}
+
+	if ( version > 0 ) {
+		change.sv = version;
+	}
+	return change;
+}
+
+function compressChanges( changes: Array<Change>, origin: {} ): ?ObjectOperationSet {
 	var modified;
 
 	if ( changes.length === 0 ) {
@@ -50,13 +76,17 @@ function compressChanges( changes, origin ) {
 	}
 
 	if ( changes.length === 1 ) {
-		return changes[0].v;
+		const change: Change = changes[0];
+		if ( change.o === 'M' ) {
+			return change.v;
+		}
+		return null;
 	}
 
 	modified = changes.reduce( function( from, change ) {
 		// deletes when, any changes after a delete are ignored
 		if ( from === null ) return null;
-		if ( from.o === changeTypes.REMOVE ) return null;
+		if ( change.o === '-' ) return null;
 		return apply_object_diff( from, change.v );
 	}, origin );
 
@@ -65,10 +95,10 @@ function compressChanges( changes, origin ) {
 	return object_diff( origin, modified );
 }
 
-function rebase( local_diff, remote_diff, origin ) {
+function rebase( local_diff: ObjectOperationSet, remote_diff: ObjectOperationSet, origin: {} ) {
 	return transform_object_diff( local_diff, remote_diff, origin );
 }
 
-function apply_diff( patch, object ) {
+function apply_diff( patch: Change, object: {} ) {
 	return apply_object_diff( object, patch );
 }

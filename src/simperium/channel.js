@@ -3,8 +3,10 @@
 import { format, inherits } from 'util'
 import events from 'events'
 import { parseMessage, parseVersionMessage, change as change_util } from './util'
+import type { ObjectOperationSet } from './jsondiff';
+import type { BucketChangeType } from './util/change';
 import JSONDiff from './jsondiff'
-import { v4 as uuid } from 'uuid'
+import uuid from 'uuid/v4'
 
 const { EventEmitter } = events;
 
@@ -15,15 +17,24 @@ type LocalChange = {
 	ccid: string
 }
 
-type NetworkChange = {
+type NetworkRemoveOperation = {
+	o: '-',
 	id: string,
 	ccids: string[],
-	o: '+' | '-' | 'M',
-	sv: number,
-	ev: number,
-	cv: string,
-	v?: {}
+	cv: string
 }
+
+type NetworkModifyOperation = {
+	o: 'M',
+	id: string,
+	ccids: string[],
+	cv: string,
+	ev: number,
+	sv: number,
+	v: ObjectOperationSet
+}
+
+type NetworkChange = NetworkModifyOperation | NetworkRemoveOperation;
 
 type NetworkChangeErrorResponse = {
 	error: number,
@@ -58,11 +69,6 @@ const CODE_EMPTY_RESPONSE = 412;
 const CODE_INVALID_DIFF = 440;
 const CODE_DUPLICATE_CHANGE = 409;
 
-const operation = {
-	MODIFY: 'M',
-	REMOVE: '-'
-};
-
 // internal methods used as instance methods on a Channel instance
 const internal = {};
 
@@ -72,8 +78,9 @@ const internal = {};
  * @param {String} cv - the change version synced
  * @returns {Promise<String>} the saved `cv`
  */
-internal.updateChangeVersion = function( cv ) {
-	return this.store.setChangeVersion( cv ).then( () => {
+internal.updateChangeVersion = function( cv ): Promise<string> {
+	const store: GhostStore = this.store;
+	return store.setChangeVersion( cv ).then( () => {
 		// A unit test currently relies on this event, otherwise we can remove it
 		this.emit( 'change-version', cv );
 		return cv;
@@ -88,11 +95,15 @@ internal.updateChangeVersion = function( cv ) {
  * @param {Object} change - the change to apply to the object
  */
 internal.changeObject = function( id: string, change: NetworkChange ) {
-	// pull out the object from the store and apply the change delta
-	var applyChange = internal.performChange.bind( this, change );
+	// Add types for now until function is changed to accept a Channel
+	const channel: Channel = this;
+	const store: GhostStore = channel.store;
+	const queue: NetworkQueue = channel.networkQueue;
 
-	this.networkQueue.queueFor( id ).add( function( done ) {
-		return applyChange().then( done, done );
+	queue.queueFor( id ).add( ( done ) => {
+		store.get( change.id )
+			.then( ghost => internal.applyChange.call( channel, change, ghost ) )
+			.then( done, done );
 	} );
 };
 
@@ -106,12 +117,11 @@ internal.changeObject = function( id: string, change: NetworkChange ) {
  * @param {Object} object - object literal of the data that the change should produce
  * @param {Object} ghost - the ghost version used to produce the change object
  */
-internal.buildModifyChange = function( id, object, ghost ) {
-	var payload = change_util.buildChange( change_util.type.MODIFY, id, object, ghost ),
-		empty = true,
-		key;
+internal.buildModifyChange = function( id: string, object: {}, ghost: Ghost ) {
+	const payload = change_util.buildChange( change_util.type.MODIFY, id, object, ghost );
+	let empty = true;
 
-	for ( key in payload.v ) {
+	for ( let key in payload.v ) {
 		if ( key ) {
 			empty = false;
 			break;
@@ -135,9 +145,10 @@ internal.buildModifyChange = function( id, object, ghost ) {
  * @param {String} id - object to remove
  * @param {Object} ghost - current ghost object for the given id
  */
-internal.buildRemoveChange = function( id, ghost ) {
-	var payload = change_util.buildChange( change_util.type.REMOVE, id, {}, ghost );
-	this.localQueue.queue( payload );
+internal.buildRemoveChange = function( id: string, ghost: Ghost ) {
+	const payload = change_util.buildChange( '-', id, {}, ghost );
+	const localQueue: LocalQueue = this.localQueue;
+	localQueue.queue( payload );
 };
 
 internal.diffAndSend = function( id, object ) {
@@ -152,7 +163,7 @@ internal.removeAndSend = function( id ) {
 
 // We've receive a full object from the network. Update the local instance and
 // notify of the new object version
-internal.updateObjectVersion = function( id, version, data, original, patch, acknowledged ) {
+internal.updateObjectVersion = function( id: string, version: number, data: {}, original, patch, acknowledged ): Promise<*> {
 	var notify,
 		changes,
 		change,
@@ -188,7 +199,7 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 	return this.store.put( id, version, data ).then( notify );
 };
 
-internal.removeObject = function( id, acknowledged ) {
+internal.removeObject = function( id, acknowledged ): Promise<*> {
 	var notify;
 	if ( !acknowledged ) {
 		notify = this.emit.bind( this, 'remove', id );
@@ -196,7 +207,8 @@ internal.removeObject = function( id, acknowledged ) {
 		notify = internal.updateAcknowledged.bind( this, acknowledged );
 	}
 
-	return this.store.remove( id ).then( notify );
+	const store: GhostStore = this.store;
+	return store.remove( id ).then( notify );
 };
 
 internal.updateAcknowledged = function( change: LocalChange ) {
@@ -207,13 +219,8 @@ internal.updateAcknowledged = function( change: LocalChange ) {
 	}
 };
 
-internal.performChange = function( change ) {
-	var success = internal.applyChange.bind( this, change );
-	return this.store.get( change.id ).then( success );
-};
-
-internal.findAcknowledgedChange = function( change: { id: string, ccids: string[] } ) {
-	var possibleChange = this.localQueue.sent[change.id];
+internal.findAcknowledgedChange = function( change: { id: string, ccids: string[] } ): ?LocalChange {
+	const possibleChange: ?LocalChange = this.localQueue.sent[change.id];
 	if ( possibleChange ) {
 		if ( ( change.ccids || [] ).indexOf( possibleChange.ccid ) > -1 ) {
 			return possibleChange;
@@ -221,7 +228,7 @@ internal.findAcknowledgedChange = function( change: { id: string, ccids: string[
 	}
 };
 
-internal.requestObjectVersion = function( id, version ) {
+internal.requestObjectVersion = function( id: string, version: number ) {
 	return new Promise( resolve => {
 		this.once( `version.${ id }.${ version }`, data => {
 			resolve( data );
@@ -232,7 +239,8 @@ internal.requestObjectVersion = function( id, version ) {
 
 const applyChangeError = ( channel: Channel, changeError: NetworkChangeErrorResponse ) => {
 	// run on network queue for the relevant bucket object
-	channel.networkQueue.queueFor( changeError.id ).add( ( done ) => {
+	const networkQueue: NetworkQueue = channel.networkQueue;
+	networkQueue.queueFor( changeError.id ).add( ( done ) => {
 		const localChange = internal.findAcknowledgedChange.call( channel, changeError );
 		const error = new ChangeError( changeError, localChange );
 		internal.handleChangeError.call( channel, error, changeError, localChange );
@@ -240,7 +248,7 @@ const applyChangeError = ( channel: Channel, changeError: NetworkChangeErrorResp
 	} )
 };
 
-internal.applyChange = function( change: NetworkChange, ghost: Ghost ) {
+internal.applyChange = function( change: NetworkChange, ghost: Ghost ): Promise<any> {
 	const acknowledged = internal.findAcknowledgedChange.call( this, change ),
 		updateChangeVersion = internal.updateChangeVersion.bind( this, change.cv );
 
@@ -248,14 +256,19 @@ internal.applyChange = function( change: NetworkChange, ghost: Ghost ) {
 		patch,
 		modified;
 
-	if ( change.o === operation.MODIFY ) {
+	if ( change.o === '-' ) {
+		return internal.removeObject.call( this, change.id, acknowledged ).then( updateChangeVersion );
+	}
+
+	if ( change.o === 'M' ) {
+		const modifyChange: NetworkModifyOperation = change;
 		const matchesStartingVersion = change.sv === ghost.version ||
 			( change.sv === 0 && ( ghost.version === null || ghost.version === undefined ) );
 		if ( ! matchesStartingVersion ) {
 			internal.requestObjectVersion.call( this, change.id, change.sv ).then( data => {
-				internal.applyChange.call( this, change, { key: ghost.key, version: change.sv, data } )
+				internal.applyChange.call( this, change, { key: ghost.key, version: modifyChange.sv, data } )
 			} );
-			return;
+			return Promise.resolve();
 		}
 
 		original = ghost.data;
@@ -263,9 +276,10 @@ internal.applyChange = function( change: NetworkChange, ghost: Ghost ) {
 		modified = jsondiff.apply_object_diff( original, patch );
 		return internal.updateObjectVersion.call( this, change.id, change.ev, modified, original, patch, acknowledged )
 			.then( updateChangeVersion );
-	} else if ( change.o === operation.REMOVE ) {
-		return internal.removeObject.bind( this )( change.id, acknowledged ).then( updateChangeVersion );
 	}
+	// Only changes of REMOVE and MODIFY are possible
+	// Should changes of ADD throw an error?
+	return Promise.resolve();
 }
 
 internal.handleChangeError = function( err: ChangeError, change: NetworkChangeErrorResponse, acknowledged: ?LocalChange ) {
@@ -340,58 +354,65 @@ internal.indexingComplete = function() {
  * @interface GhostStore
  */
 interface GhostStore {
-/**
- * Retrieve a Ghost for the given bucket object id
- *
- * @function
- * @name GhostStore#get
- * @param {String} id - bucket object id
- * @returns {Promise<Ghost>} - the ghost for this object
- */
+	/**
+	 * Retrieve a Ghost for the given bucket object id
+	 *
+	 * @function
+	 * @name GhostStore#get
+	 * @param {String} id - bucket object id
+	 * @returns {Promise<Ghost>} - the ghost for this object
+	 */
+	 get( id: string ): Promise<Ghost>;
 
-/**
- * Save a ghost in the store.
- *
- * @function
- * @name GhostStore#put
- * @param {String} id - bucket object id
- * @param {Number} version - version of ghost data
- * @param {Object} data - object literal to save as this ghost's data for this version
- * @returns {Promise<Ghost>} - the ghost for this object
- */
+	/**
+	 * Save a ghost in the store.
+	 *
+	 * @function
+	 * @name GhostStore#put
+	 * @param {String} id - bucket object id
+	 * @param {Number} version - version of ghost data
+	 * @param {Object} data - object literal to save as this ghost's data for this version
+	 * @returns {Promise<Ghost>} - the ghost for this object
+	 */
+	 put(id: string, version: number, data: {}): Promise<Ghost>;
 
-/**
- * Delete a Ghost from the store.
- *
- * @function
- * @name GhostStore#remove
- * @param {String} id - bucket object id
- * @returns {Promise<Ghost>} - the ghost for this object
- */
+	/**
+	 * Delete a Ghost from the store.
+	 *
+	 * @function
+	 * @name GhostStore#remove
+	 * @param {String} id - bucket object id
+	 * @returns {Promise<Ghost>} - the ghost for this object
+	 */
+	 remove(id: string): Promise<Ghost>;
 
-/**
- * Iterate over existing Ghost objects with the given callback.
- *
- * @function
- * @name GhostStore#eachGhost
- * @param {ghostIterator} - function to run against each ghost
- */
+	/**
+	 * Iterate over existing Ghost objects with the given callback.
+	 *
+	 * @function
+	 * @name GhostStore#eachGhost
+	 * @param {ghostIterator} - function to run against each ghost
+	 */
+	 eachGhost(iterator: (Ghost) => void): void;
 
-/**
- * Get the current change version (cv) that this channel has synced.
- *
- * @function
- * @name GhostStore#getChangeVersion
- * @returns {Promise<String>} - the current change version for the bucket
- */
+	/**
+	 * Get the current change version (cv) that this channel has synced.
+	 *
+	 * @function
+	 * @name GhostStore#getChangeVersion
+	 * @returns {Promise<String>} - the current change version for the bucket
+	 */
+	 getChangeVersion(): Promise<string>;
 
-/**
- * Set the current change version.
- *
- * @function
- * @name GhostStore#setChangeVersion
- * @returns {Promise<Void>} - resolves once the change version is saved
- */
+	/**
+	 * Set the current change version.
+	 *
+	 * @function
+	 * @name GhostStore#setChangeVersion
+	 * @param {string} changeVersion - new change version
+	 * @returns {Promise<Void>} - resolves once the change version is saved
+	 */
+	 setChangeVersion(changeVersion: string): Promise<void>;
 }
 
 /**
@@ -686,7 +707,7 @@ type ChangeMessage = {
 	clientid?: string,
 	ccids?: string[],
 	id?: string, // Bucket object being changed
-	o?: string,
+	o?: BucketChangeType,
 	v?: {},
 	cv?: string,
 	sv?: number,
@@ -696,11 +717,11 @@ type ChangeMessage = {
 };
 
 const requireProp = <T>( key: string, object: {} ): T => {
-	const value = object[ key ];
+	const value: T = object[ key ];
 	if ( value ) {
 		return value;
 	}
-	throw new Error( `unexpected value ${ value } for key ${ key } in ${ JSON.stringify( object ) }` );
+	throw new Error( `unexpected value for key ${ key } in ${ JSON.stringify( object ) }` );
 }
 
 const asNetworkErrorResponse = ( changeMessage: ChangeMessage ): NetworkChangeErrorResponse => {
@@ -712,17 +733,53 @@ const asNetworkErrorResponse = ( changeMessage: ChangeMessage ): NetworkChangeEr
 	};
 }
 
+class ProtocolError extends Error {
+}
+
 const asNetworkChange = ( changeMessage: ChangeMessage ): NetworkChange => {
-	return {
-		id: requireProp( 'id', changeMessage ),
-		ccids: requireProp( 'ccids', changeMessage ),
-		o: requireProp( 'o', changeMessage ),
-		d: changeMessage.id,
-		cv: requireProp( 'cv', changeMessage ),
-		ev: requireProp( 'ev', changeMessage ),
-		sv: changeMessage.sv ? changeMessage.sv : 0,
-		v: changeMessage.v // v not required for `-` change types
-	};
+	const operation: ?BucketChangeType = changeMessage.o;
+
+	if ( ! changeMessage.ccids ) {
+		throw new ProtocolError( 'nework change missing ccids' );
+	}
+
+	if ( ! changeMessage.cv ) {
+		throw new ProtocolError( 'netwock change missing change version (cv)');
+	}
+
+	if ( ! changeMessage.id ) {
+		throw new ProtocolError( 'network change missing id');
+	}
+
+	if ( operation === '-' ) {
+		return {
+			id: changeMessage.id,
+			cv: changeMessage.cv,
+			ccids: changeMessage.ccids,
+			o: '-',
+			sv: changeMessage.sv ? changeMessage.sv : 0,
+		}
+	}
+	if ( operation === 'M' ) {
+		if ( ! changeMessage.ev ) {
+			throw new ProtocolError( 'network modify change missing ev' );
+		}
+
+		if ( ! changeMessage.v ) {
+			throw new ProtocolError( 'network modify change missing v' );
+		}
+
+		return {
+			id: changeMessage.id,
+			cv: changeMessage.cv,
+			ccids: changeMessage.ccids,
+			o: 'M',
+			sv: changeMessage.sv ? changeMessage.sv : 0,
+			ev: changeMessage.ev,
+			v: changeMessage.v
+		}
+	}
+	throw new Error( `Invalid change type ${ operation ? operation : '<null>' } in c:${ JSON.stringify( changeMessage )}` );
 }
 
 Channel.prototype.onChanges = function( data ) {
@@ -787,7 +844,7 @@ function Queue() {
 inherits( Queue, EventEmitter );
 
 // Add a function at the end of the queue
-Queue.prototype.add = function( fn ) {
+Queue.prototype.add = function( fn: ( () => void ) => void ): Queue {
 	this.queue.push( fn );
 	this.start();
 	return this;
@@ -814,7 +871,7 @@ Queue.prototype.run = function() {
 	fn( this.run.bind( this ) );
 }
 
-function LocalQueue( store ) {
+function LocalQueue( store: GhostStore ) {
 	this.store = store;
 	this.sent = {};
 	this.queues = {};
