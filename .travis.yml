@@ -1,10 +1,12 @@
 language: node_js
 sudo: false
 script:
+# Enable flow to have flow errors fail the build
+# - npm -s run flow
 # lint errors fail the build
-- npm run lint
+- npm -s run lint
 # unit tests with coverage report
-- npm run test:coverage
+- npm -s run test:coverage
 node_js:
 - '8'
 - '7'

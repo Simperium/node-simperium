@@ -1,21 +1,160 @@
+// @flow
 /*eslint no-shadow: 0*/
 import { format, inherits } from 'util'
-import { EventEmitter } from 'events'
+import events from 'events'
 import { parseMessage, parseVersionMessage, change as change_util } from './util'
+import type { ObjectOperationSet } from './jsondiff';
+import type { BucketChangeType } from './util/change';
 import JSONDiff from './jsondiff'
-import { v4 as uuid } from 'uuid'
+import uuid from 'uuid/v4'
+
+const { EventEmitter } = events;
+
+/**
+ * A ghost represents a version of a bucket object as known by Simperium
+ *
+ * Generally a client will keep the last known ghost stored locally for efficient
+ * diffing and patching of Simperium change operations.
+ *
+ * @typedef {Object} Ghost
+ * @property {Number} version - the ghost's version
+ * @property {String} key - the simperium bucket object id this ghost is for
+ * @property {Object} data - the data for the given ghost version
+ */
+type Ghost = {
+	key: string,
+	version: number,
+	data: {}
+}
+
+/**
+ * Callback function used by the ghost store to iterate over existing ghosts
+ *
+ * @callback ghostIterator
+ * @param {Ghost} - the current ghost
+ */
+
+/**
+ * A GhostStore provides the store mechanism for ghost data that the Channel
+ * uses to maintain syncing state and producing change operations for
+ * Bucket objects.
+ *
+ * @interface GhostStore
+ */
+interface GhostStore {
+	/**
+	 * Retrieve a Ghost for the given bucket object id
+	 *
+	 * @function
+	 * @name GhostStore#get
+	 * @param {String} id - bucket object id
+	 * @returns {Promise<Ghost>} - the ghost for this object
+	 */
+	get( id: string ): Promise<Ghost>;
+
+	/**
+	 * Save a ghost in the store.
+	 *
+	 * @function
+	 * @name GhostStore#put
+	 * @param {String} id - bucket object id
+	 * @param {Number} version - version of ghost data
+	 * @param {Object} data - object literal to save as this ghost's data for this version
+	 * @returns {Promise<Ghost>} - the ghost for this object
+	 */
+	put( id: string, version: number, data: {} ): Promise<Ghost>;
+
+	/**
+	 * Delete a Ghost from the store.
+	 *
+	 * @function
+	 * @name GhostStore#remove
+	 * @param {String} id - bucket object id
+	 * @returns {Promise<Ghost>} - the ghost for this object
+	 */
+	remove( id: string ): Promise<Ghost>;
+
+	/**
+	 * Iterate over existing Ghost objects with the given callback.
+	 *
+	 * @function
+	 * @name GhostStore#eachGhost
+	 * @param {ghostIterator} - function to run against each ghost
+	 */
+	eachGhost( iterator: ( Ghost ) => void ): void;
+
+	/**
+	 * Get the current change version (cv) that this channel has synced.
+	 *
+	 * @function
+	 * @name GhostStore#getChangeVersion
+	 * @returns {Promise<String>} - the current change version for the bucket
+	 */
+	getChangeVersion(): Promise<string>;
+
+	/**
+	 * Set the current change version.
+	 *
+	 * @function
+	 * @name GhostStore#setChangeVersion
+	 * @param {string} changeVersion - new change version
+	 * @returns {Promise<Void>} - resolves once the change version is saved
+	 */
+	setChangeVersion( changeVersion: string ): Promise<void>;
+}
 
 const jsondiff = new JSONDiff( {list_diff: false} );
+
+type LocalChange = {
+	id: string,
+	ccid: string
+}
+
+type NetworkRemoveOperation = {
+	o: '-',
+	id: string,
+	ccids: string[],
+	cv: string
+}
+
+type NetworkModifyOperation = {
+	o: 'M',
+	id: string,
+	ccids: string[],
+	cv: string,
+	ev: number,
+	sv: number,
+	v: ObjectOperationSet
+}
+
+type NetworkChange = NetworkModifyOperation | NetworkRemoveOperation;
+
+type NetworkChangeErrorResponse = {
+	error: number,
+	id: string,
+	ccids: string[],
+	d: ?{},
+	hasSentFullObject?: boolean
+};
+
+class ChangeError extends Error {
+	code: number;
+	changeError: NetworkChangeErrorResponse;
+	change: ?LocalChange;
+
+	constructor( changeError: NetworkChangeErrorResponse, localChange: ?LocalChange ) {
+		super( `${changeError.error} - Could not apply change to: ${changeError.id}` );
+		this.code = changeError.error;
+		this.changeError = changeError;
+		this.change = localChange;
+	}
+}
 
 const UNKNOWN_CV = '?';
 const CODE_INVALID_VERSION = 405;
 const CODE_EMPTY_RESPONSE = 412;
 const CODE_INVALID_DIFF = 440;
-
-const operation = {
-	MODIFY: 'M',
-	REMOVE: '-'
-};
+const CODE_DUPLICATE_CHANGE = 409;
 
 // internal methods used as instance methods on a Channel instance
 const internal = {};
@@ -26,8 +165,9 @@ const internal = {};
  * @param {String} cv - the change version synced
  * @returns {Promise<String>} the saved `cv`
  */
-internal.updateChangeVersion = function( cv ) {
-	return this.store.setChangeVersion( cv ).then( () => {
+internal.updateChangeVersion = function( cv ): Promise<string> {
+	const store: GhostStore = this.store;
+	return store.setChangeVersion( cv ).then( () => {
 		// A unit test currently relies on this event, otherwise we can remove it
 		this.emit( 'change-version', cv );
 		return cv;
@@ -41,12 +181,16 @@ internal.updateChangeVersion = function( cv ) {
  * @param {String} id - id of the object changed
  * @param {Object} change - the change to apply to the object
  */
-internal.changeObject = function( id, change ) {
-	// pull out the object from the store and apply the change delta
-	var applyChange = internal.performChange.bind( this, change );
+internal.changeObject = function( id: string, change: NetworkChange ) {
+	// Add types for now until function is changed to accept a Channel
+	const channel: Channel = this;
+	const store: GhostStore = channel.store;
+	const queue: NetworkQueue = channel.networkQueue;
 
-	this.networkQueue.queueFor( id ).add( function( done ) {
-		return applyChange().then( done, done );
+	queue.queueFor( id ).add( ( done ) => {
+		store.get( change.id )
+			.then( ghost => internal.applyChange.call( channel, change, ghost ) )
+			.then( done, done );
 	} );
 };
 
@@ -60,12 +204,11 @@ internal.changeObject = function( id, change ) {
  * @param {Object} object - object literal of the data that the change should produce
  * @param {Object} ghost - the ghost version used to produce the change object
  */
-internal.buildModifyChange = function( id, object, ghost ) {
-	var payload = change_util.buildChange( change_util.type.MODIFY, id, object, ghost ),
-		empty = true,
-		key;
+internal.buildModifyChange = function( id: string, object: {}, ghost: Ghost ) {
+	const payload = change_util.buildChange( change_util.type.MODIFY, id, object, ghost );
+	let empty = true;
 
-	for ( key in payload.v ) {
+	for ( let key in payload.v ) {
 		if ( key ) {
 			empty = false;
 			break;
@@ -89,9 +232,10 @@ internal.buildModifyChange = function( id, object, ghost ) {
  * @param {String} id - object to remove
  * @param {Object} ghost - current ghost object for the given id
  */
-internal.buildRemoveChange = function( id, ghost ) {
-	var payload = change_util.buildChange( change_util.type.REMOVE, id, {}, ghost );
-	this.localQueue.queue( payload );
+internal.buildRemoveChange = function( id: string, ghost: Ghost ) {
+	const payload = change_util.buildChange( '-', id, {}, ghost );
+	const localQueue: LocalQueue = this.localQueue;
+	localQueue.queue( payload );
 };
 
 internal.diffAndSend = function( id, object ) {
@@ -106,7 +250,7 @@ internal.removeAndSend = function( id ) {
 
 // We've receive a full object from the network. Update the local instance and
 // notify of the new object version
-internal.updateObjectVersion = function( id, version, data, original, patch, acknowledged ) {
+internal.updateObjectVersion = function( id: string, version: number, data: {}, original, patch, acknowledged ): Promise<*> {
 	var notify,
 		changes,
 		change,
@@ -142,7 +286,7 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 	return this.store.put( id, version, data ).then( notify );
 };
 
-internal.removeObject = function( id, acknowledged ) {
+internal.removeObject = function( id, acknowledged ): Promise<*> {
 	var notify;
 	if ( !acknowledged ) {
 		notify = this.emit.bind( this, 'remove', id );
@@ -150,10 +294,11 @@ internal.removeObject = function( id, acknowledged ) {
 		notify = internal.updateAcknowledged.bind( this, acknowledged );
 	}
 
-	return this.store.remove( id ).then( notify );
+	const store: GhostStore = this.store;
+	return store.remove( id ).then( notify );
 };
 
-internal.updateAcknowledged = function( change ) {
+internal.updateAcknowledged = function( change: LocalChange ) {
 	var id = change.id;
 	if ( this.localQueue.sent[id] === change ) {
 		this.localQueue.acknowledge( change );
@@ -161,13 +306,8 @@ internal.updateAcknowledged = function( change ) {
 	}
 };
 
-internal.performChange = function( change ) {
-	var success = internal.applyChange.bind( this, change );
-	return this.store.get( change.id ).then( success );
-};
-
-internal.findAcknowledgedChange = function( change ) {
-	var possibleChange = this.localQueue.sent[change.id];
+internal.findAcknowledgedChange = function( change: { id: string, ccids: string[] } ): ?LocalChange {
+	const possibleChange: ?LocalChange = this.localQueue.sent[change.id];
 	if ( possibleChange ) {
 		if ( ( change.ccids || [] ).indexOf( possibleChange.ccid ) > -1 ) {
 			return possibleChange;
@@ -175,7 +315,7 @@ internal.findAcknowledgedChange = function( change ) {
 	}
 };
 
-internal.requestObjectVersion = function( id, version ) {
+internal.requestObjectVersion = function( id: string, version: number ) {
 	return new Promise( resolve => {
 		this.once( `version.${ id }.${ version }`, data => {
 			resolve( data );
@@ -184,36 +324,38 @@ internal.requestObjectVersion = function( id, version ) {
 	} );
 };
 
-internal.applyChange = function( change, ghost ) {
-	const acknowledged = internal.findAcknowledgedChange.bind( this )( change ),
+const applyChangeError = ( channel: Channel, changeError: NetworkChangeErrorResponse ) => {
+	// run on network queue for the relevant bucket object
+	const networkQueue: NetworkQueue = channel.networkQueue;
+	networkQueue.queueFor( changeError.id ).add( ( done ) => {
+		const localChange = internal.findAcknowledgedChange.call( channel, changeError );
+		const error = new ChangeError( changeError, localChange );
+		internal.handleChangeError.call( channel, error, changeError, localChange );
+		done();
+	} )
+};
+
+internal.applyChange = function( change: NetworkChange, ghost: Ghost ): Promise<any> {
+	const acknowledged = internal.findAcknowledgedChange.call( this, change ),
 		updateChangeVersion = internal.updateChangeVersion.bind( this, change.cv );
 
-	let error,
-		original,
+	let original,
 		patch,
 		modified;
-	// attempt to apply the change
-	// TODO: Handle errors as specified in
-	//	 0:c:[{"ccids": ["0435edf4-3f07-4cc6-bf86-f68e6db8779c"], "id": "9e9a9616-8174-42
-	// { ccids: [ '0435edf4-3f07-4cc6-bf86-f68e6db8779c' ],
-	//	 id: '9e9a9616-8174-425a-a1b0-9ed5410f1edc',
-	//	 clientid: 'node-b9776e96-c068-42ae-893a-03f50833bddb',
-	//	 error: 400 }
-	if ( change.error ) {
-		error = new Error( `${change.error} - Could not apply change to: ${ghost.key}` );
-		error.code = change.error;
-		error.change = change;
-		error.ghost = ghost;
-		internal.handleChangeError.call( this, error, change, acknowledged );
-		return;
+
+	if ( change.o === '-' ) {
+		return internal.removeObject.call( this, change.id, acknowledged ).then( updateChangeVersion );
 	}
 
-	if ( change.o === operation.MODIFY ) {
-		if ( ghost && ( ghost.version !== change.sv ) ) {
+	if ( change.o === 'M' ) {
+		const modifyChange: NetworkModifyOperation = change;
+		const matchesStartingVersion = change.sv === ghost.version ||
+			( change.sv === 0 && ( ghost.version === null || ghost.version === undefined ) );
+		if ( ! matchesStartingVersion ) {
 			internal.requestObjectVersion.call( this, change.id, change.sv ).then( data => {
-				internal.applyChange.call( this, change, { version: change.sv, data } )
+				internal.applyChange.call( this, change, { key: ghost.key, version: modifyChange.sv, data } )
 			} );
-			return;
+			return Promise.resolve();
 		}
 
 		original = ghost.data;
@@ -221,13 +363,18 @@ internal.applyChange = function( change, ghost ) {
 		modified = jsondiff.apply_object_diff( original, patch );
 		return internal.updateObjectVersion.call( this, change.id, change.ev, modified, original, patch, acknowledged )
 			.then( updateChangeVersion );
-	} else if ( change.o === operation.REMOVE ) {
-		return internal.removeObject.bind( this )( change.id, acknowledged ).then( updateChangeVersion );
 	}
+	// Only changes of REMOVE and MODIFY are possible
+	// Should changes of ADD throw an error?
+	return Promise.resolve();
 }
 
-internal.handleChangeError = function( err, change, acknowledged ) {
+internal.handleChangeError = function( err: ChangeError, change: NetworkChangeErrorResponse, acknowledged: ?LocalChange ) {
 	switch ( err.code ) {
+		case CODE_DUPLICATE_CHANGE:
+			if ( ! acknowledged ) {
+				break;
+			}
 		case CODE_INVALID_VERSION:
 		case CODE_INVALID_DIFF: // Invalid version or diff, send full object back to server
 			if ( ! change.hasSentFullObject ) {
@@ -242,7 +389,9 @@ internal.handleChangeError = function( err, change, acknowledged ) {
 
 			break;
 		case CODE_EMPTY_RESPONSE: // Change causes no change, just acknowledge it
-			internal.updateAcknowledged.call( this, acknowledged );
+			if ( acknowledged ) {
+				internal.updateAcknowledged.call( this, acknowledged );
+			}
 			break;
 		default:
 			this.emit( 'error', err, change );
@@ -266,87 +415,6 @@ internal.indexingComplete = function() {
 }
 
 /**
- * A ghost represents a version of a bucket object as known by Simperium
- *
- * Generally a client will keep the last known ghost stored locally for efficient
- * diffing and patching of Simperium change operations.
- *
- * @typedef {Object} Ghost
- * @property {Number} version - the ghost's version
- * @property {String} key - the simperium bucket object id this ghost is for
- * @property {Object} data - the data for the given ghost version
- */
-
-/**
- * Callback function used by the ghost store to iterate over existing ghosts
- *
- * @callback ghostIterator
- * @param {Ghost} - the current ghost
- */
-
-/**
- * A GhostStore provides the store mechanism for ghost data that the Channel
- * uses to maintain syncing state and producing change operations for
- * Bucket objects.
- *
- * @interface GhostStore
- */
-
-/**
- * Retrieve a Ghost for the given bucket object id
- *
- * @function
- * @name GhostStore#get
- * @param {String} id - bucket object id
- * @returns {Promise<Ghost>} - the ghost for this object
- */
-
-/**
- * Save a ghost in the store.
- *
- * @function
- * @name GhostStore#put
- * @param {String} id - bucket object id
- * @param {Number} version - version of ghost data
- * @param {Object} data - object literal to save as this ghost's data for this version
- * @returns {Promise<Ghost>} - the ghost for this object
- */
-
-/**
- * Delete a Ghost from the store.
- *
- * @function
- * @name GhostStore#remove
- * @param {String} id - bucket object id
- * @returns {Promise<Ghost>} - the ghost for this object
- */
-
-/**
- * Iterate over existing Ghost objects with the given callback.
- *
- * @function
- * @name GhostStore#eachGhost
- * @param {ghostIterator} - function to run against each ghost
- */
-
-/**
- * Get the current change version (cv) that this channel has synced.
- *
- * @function
- * @name GhostStore#getChangeVersion
- * @returns {Promise<String>} - the current change version for the bucket
- */
-
-/**
- * Set the current change version.
- *
- * @function
- * @name GhostStore#setChangeVersion
- * @returns {Promise<Void>} - resolves once the change version is saved
- */
-
-
-/**
  * Maintains syncing state for a Simperium bucket.
  *
  * A bucket uses a channel to listen for updates that come from simperium while
@@ -364,7 +432,7 @@ internal.indexingComplete = function() {
  * @param {GhostStore} store - data storage for ghost objects
  * @param {String} name - the name of the bucket on Simperium.com
  */
-export default function Channel( appid, access_token, store, name ) {
+export default function Channel( appid: string, access_token: string, store: GhostStore, name: string ) {
 	// Uses an event emitter to handle different Simperium  commands
 	const message = this.message = new EventEmitter();
 
@@ -634,12 +702,95 @@ Channel.prototype.sendChangeVersionRequest = function( cv ) {
 	this.send( format( 'cv:%s', cv ) );
 };
 
+type ChangeMessage = {
+	clientid?: string,
+	ccids?: string[],
+	id?: string, // Bucket object being changed
+	o?: BucketChangeType,
+	v?: {},
+	cv?: string,
+	sv?: number,
+	ev?: number,
+	error?: number,
+	d?: {}
+};
+
+const requireProp = <T>( key: string, object: {} ): T => {
+	const value: T = object[ key ];
+	if ( value ) {
+		return value;
+	}
+	throw new Error( `unexpected value for key ${ key } in ${ JSON.stringify( object ) }` );
+}
+
+const asNetworkErrorResponse = ( changeMessage: ChangeMessage ): NetworkChangeErrorResponse => {
+	return {
+		id: requireProp( 'id', changeMessage ),
+		d: changeMessage.d,
+		ccids: requireProp( 'ccids', changeMessage ),
+		error: requireProp( 'error', changeMessage )
+	};
+}
+
+class ProtocolError extends Error {
+}
+
+const asNetworkChange = ( changeMessage: ChangeMessage ): NetworkChange => {
+	const operation: ?BucketChangeType = changeMessage.o;
+
+	if ( ! changeMessage.ccids ) {
+		throw new ProtocolError( 'nework change missing ccids' );
+	}
+
+	if ( ! changeMessage.cv ) {
+		throw new ProtocolError( 'netwock change missing change version (cv)' );
+	}
+
+	if ( ! changeMessage.id ) {
+		throw new ProtocolError( 'network change missing id' );
+	}
+
+	if ( operation === '-' ) {
+		return {
+			id: changeMessage.id,
+			cv: changeMessage.cv,
+			ccids: changeMessage.ccids,
+			o: '-',
+			sv: changeMessage.sv ? changeMessage.sv : 0,
+		}
+	}
+	if ( operation === 'M' ) {
+		if ( ! changeMessage.ev ) {
+			throw new ProtocolError( 'network modify change missing ev' );
+		}
+
+		if ( ! changeMessage.v ) {
+			throw new ProtocolError( 'network modify change missing v' );
+		}
+
+		return {
+			id: changeMessage.id,
+			cv: changeMessage.cv,
+			ccids: changeMessage.ccids,
+			o: 'M',
+			sv: changeMessage.sv ? changeMessage.sv : 0,
+			ev: changeMessage.ev,
+			v: changeMessage.v
+		}
+	}
+	throw new Error( `Invalid change type ${ operation ? operation : '<null>' } in c:${ JSON.stringify( changeMessage )}` );
+}
+
 Channel.prototype.onChanges = function( data ) {
 	var changes = JSON.parse( data ),
 		onChange = internal.changeObject.bind( this );
 
-	changes.forEach( function( change ) {
-		onChange( change.id, change );
+	changes.forEach( ( change ) => {
+		if ( change.error ) {
+			applyChangeError( this, asNetworkErrorResponse( change ) );
+		} else {
+			onChange( change.id, asNetworkChange( change ) );
+		}
 	} );
 	// emit ready after all server changes have been applied
 	this.emit( 'ready' );
@@ -692,7 +843,7 @@ function Queue() {
 inherits( Queue, EventEmitter );
 
 // Add a function at the end of the queue
-Queue.prototype.add = function( fn ) {
+Queue.prototype.add = function( fn: ( () => void ) => void ): Queue {
 	this.queue.push( fn );
 	this.start();
 	return this;
@@ -719,7 +870,7 @@ Queue.prototype.run = function() {
 	fn( this.run.bind( this ) );
 }
 
-function LocalQueue( store ) {
+function LocalQueue( store: GhostStore ) {
 	this.store = store;
 	this.sent = {};
 	this.queues = {};
@@ -866,7 +1017,7 @@ LocalQueue.prototype.resendSentChanges = function() {
  *
  * @type {Map<String,Object>} stores specific revisions as a cache
  */
-export const revisionCache = new Map();
+export const revisionCache: Map<string, {}> = new Map();
 
 /**
  * Attempts to fetch an entity's revisions
@@ -966,8 +1117,9 @@ function collectionRevisions( channel, id, callback ) {
 		requestedVersions.add( version );
 
 		// fetch from server or local cache
-		if ( revisionCache.has( `${ id }.${ version }` ) ) {
-			onVersion( id, version, revisionCache.get( `${ id }.${ version }` ) );
+		const cached = revisionCache.get( `${ id }.${ version }` );
+		if ( cached ) {
+			onVersion( id, version, cached );
 		} else {
 			channel.send( `e:${ id }.${ version }` );
 		}

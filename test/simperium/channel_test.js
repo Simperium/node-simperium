@@ -77,9 +77,9 @@ describe( 'Channel', function() {
 			version1 = { content: 'step 1'},
 			version2 = { content: 'step 2'},
 			version3 = { content: 'step 3'},
-			change1 = { o: 'M', ev: 1, cv: 'cv1', id: id, v: diff( {}, version1 )},
-			change2 = { o: 'M', ev: 2, sv: 1, cv: 'cv2', id: id, v: diff( version1, version2 )},
-			change3 = { o: 'M', ev: 3, sv: 2, cv: 'cv3', id: id, v: diff( version2, version3 )},
+			change1 = { o: 'M', ccids: [], ev: 1, cv: 'cv1', id: id, v: diff( {}, version1 )},
+			change2 = { o: 'M', ccids: [], ev: 2, sv: 1, cv: 'cv2', id: id, v: diff( version1, version2 )},
+			change3 = { o: 'M', ccids: [], ev: 3, sv: 2, cv: 'cv3', id: id, v: diff( version2, version3 )},
 			check = fn.counts( 2, function( id, data ) {
 				equal( data.content, 'step 3' );
 				done();
@@ -238,7 +238,7 @@ describe( 'Channel', function() {
 		it( 'should notify bucket after receiving a network change', () => {
 			const id = 'object',
 				data = { content: 'step 1'},
-				change = { o: 'M', ev: 1, cv: 'cv1', id: id, v: diff( {}, data )};
+				change = { o: 'M', ccids: [], ev: 1, cv: 'cv1', id: id, v: diff( {}, data )};
 
 			return new Promise( ( resolve ) => {
 				bucket.on( 'update', () => {
@@ -268,7 +268,7 @@ describe( 'Channel', function() {
 
 			bucket.update( key, {title: 'hello world'}, function() {
 				channel.handleMessage( 'c:' + JSON.stringify( [{
-					o: '-', ev: 1, cv: 'cv1', id: key
+					o: '-', ev: 1, cv: 'cv1', id: key, ccids: []
 				}] ) );
 			} );
 		} ) );
@@ -348,7 +348,7 @@ describe( 'Channel', function() {
 
 			// We receive a remote change from "Hello world" to "Hello kansas"
 			channel.handleMessage( 'c:' + JSON.stringify( [{
-				o: 'M', ev: 2, sv: 1, cv: 'cv1', id: key, v: remoteDiff
+				o: 'M', ev: 2, sv: 1, cv: 'cv1', id: key, v: remoteDiff, ccids: []
 			}] ) );
 
 			// We're changing "Hello world" to "Goodbye world"
@@ -529,7 +529,7 @@ describe( 'Channel', function() {
 		} );
 
 		it( 'should request entire object when source version is out of date', ( done ) => {
-			var change = {o: 'M', id: 'thing', sv: 1, ev: 2, ccid: 'abc', cv: 'new-cv', v: diff( { hello: 'mundo'}, {hello: 'world'} ) };
+			var change = {o: 'M', id: 'thing', sv: 1, ev: 2, ccids: ['abc'], cv: 'new-cv', v: diff( { hello: 'mundo'}, {hello: 'world'} ) };
 			channel.once( 'send', ( data ) => {
 				equal( data, `e:${change.id}.${change.sv}` );
 				channel.once( 'change-version', ( cv ) => {

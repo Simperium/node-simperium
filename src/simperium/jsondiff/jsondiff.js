@@ -1,14 +1,46 @@
-var diff_match_patch = require('./diff_match_patch');
+// @flow
+import diff_match_patch, { DIFF_EQUAL, DIFF_INSERT, DIFF_DELETE } from './diff_match_patch';
+
+// These ar the types of changes that can be applied to a value
+type PropertyChangeType
+  = '+' // add the value at `v`
+  | '-' // remove the key from the object
+  | 'r' // replace the key value of object with `v`
+  | 'I' // increment the value at key, requires the value to be numerical
+  | 'L' // apply a list diff operation to the property at v
+  | 'O' // apply an object diff operation to the property at v
+  | 'd' // apply a diff match patch operation to the property at v
+
+// Add a value, will exist within an object operation
+type AddOperation = { o: '+', v: any }
+type ReplaceOperation = { o: 'r', v: any }
+
+type RemoveOperation = { o: '-' };
+type IncrementOperation = { o: 'I', v: number }
+type ListOperation = { o: 'L', v: { [key: number]: Operation } };
+// an object diff is indexed by the key name that the diff applies to
+
+export type ObjectOperationSet = { [key: string]: Operation };
+type ObjectOperation = { o: 'O', v: ObjectOperationSet };
+
+type DiffMatchPathOperation = { o: 'd', v: string }
+
+
+export type Operation
+  // adds a value to an object, is a child of another change
+  = AddOperation
+  | ReplaceOperation
+  | RemoveOperation
+  | IncrementOperation
+  | ListOperation
+  | ObjectOperation
+  | DiffMatchPathOperation
 
 // stolen from https://raw.github.com/Simperium/jsondiff/master/src/jsondiff.js
-(function() {
-  var jsondiff,
-    __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
-    __hasProp = Object.prototype.hasOwnProperty;
+    const __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
+    const __hasProp = Object.prototype.hasOwnProperty;
 
-  jsondiff = (function() {
-
-    function jsondiff(options) {
+    export default function jsondiff(options: ? { list_diff: boolean } ) {
       this.options = options || {list_diff: true};
       this.patch_apply_with_offsets = __bind(this.patch_apply_with_offsets, this);
       this.transform_object_diff = __bind(this.transform_object_diff, this);
@@ -168,7 +200,7 @@ var diff_match_patch = require('./diff_match_patch');
       return diffs;
     };
 
-    jsondiff.prototype.object_diff = function(a, b) {
+    jsondiff.prototype.object_diff = function(a: {}, b: {}): DiffSet {
       var diffs, key;
       diffs = {};
       if (!(a != null) || !(b != null)) return {};
@@ -298,8 +330,8 @@ var diff_match_patch = require('./diff_match_patch');
       return patched;
     };
 
-    jsondiff.prototype.apply_object_diff = function(s, diffs) {
-      var dmp_diffs, dmp_patches, dmp_result, key, op, patched;
+    jsondiff.prototype.apply_object_diff = function(s: {}, diffs: ObjectOperationSet): {} {
+      var dmp_diffs, dmp_patches, dmp_result, key, op, patched: {};
       patched = this.deepCopy(s);
       for (key in diffs) {
         if (!__hasProp.call(diffs, key)) continue;
@@ -429,7 +461,7 @@ var diff_match_patch = require('./diff_match_patch');
       return ad_new;
     };
 
-    jsondiff.prototype.transform_object_diff = function(ad, bd, s) {
+    jsondiff.prototype.transform_object_diff = function(ad: ObjectOperationSet, bd: ObjectOperationSet, s: {}): ?ObjectOperationSet {
       var a_patches, ab_text, ad_new, aop, b_patches, b_text, bop, dmp_diffs, dmp_patches, dmp_result, key, sk, _ref;
       ad_new = this.deepCopy(ad);
       for (key in ad) {
@@ -611,11 +643,3 @@ var diff_match_patch = require('./diff_match_patch');
     text = text.substring(nullPadding.length, text.length - nullPadding.length);
     return text;
   };
-
-    return jsondiff;
-
-  })();
-
-  module.exports = jsondiff;
-
-}).call();
