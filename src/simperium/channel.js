@@ -10,6 +10,100 @@ import uuid from 'uuid/v4'
 
 const { EventEmitter } = events;
 
+type Ghost = {
+	key: string,
+	version: number,
+	data: {}
+}
+
+/**
+ * A ghost represents a version of a bucket object as known by Simperium
+ *
+ * Generally a client will keep the last known ghost stored locally for efficient
+ * diffing and patching of Simperium change operations.
+ *
+ * @typedef {Object} Ghost
+ * @property {Number} version - the ghost's version
+ * @property {String} key - the simperium bucket object id this ghost is for
+ * @property {Object} data - the data for the given ghost version
+ */
+
+/**
+ * Callback function used by the ghost store to iterate over existing ghosts
+ *
+ * @callback ghostIterator
+ * @param {Ghost} - the current ghost
+ */
+
+/**
+ * A GhostStore provides the store mechanism for ghost data that the Channel
+ * uses to maintain syncing state and producing change operations for
+ * Bucket objects.
+ *
+ * @interface GhostStore
+ */
+interface GhostStore {
+	/**
+	 * Retrieve a Ghost for the given bucket object id
+	 *
+	 * @function
+	 * @name GhostStore#get
+	 * @param {String} id - bucket object id
+	 * @returns {Promise<Ghost>} - the ghost for this object
+	 */
+	get( id: string ): Promise<Ghost>;
+
+	/**
+	 * Save a ghost in the store.
+	 *
+	 * @function
+	 * @name GhostStore#put
+	 * @param {String} id - bucket object id
+	 * @param {Number} version - version of ghost data
+	 * @param {Object} data - object literal to save as this ghost's data for this version
+	 * @returns {Promise<Ghost>} - the ghost for this object
+	 */
+	put( id: string, version: number, data: {} ): Promise<Ghost>;
+
+	/**
+	 * Delete a Ghost from the store.
+	 *
+	 * @function
+	 * @name GhostStore#remove
+	 * @param {String} id - bucket object id
+	 * @returns {Promise<Ghost>} - the ghost for this object
+	 */
+	remove( id: string ): Promise<Ghost>;
+
+	/**
+	 * Iterate over existing Ghost objects with the given callback.
+	 *
+	 * @function
+	 * @name GhostStore#eachGhost
+	 * @param {ghostIterator} - function to run against each ghost
+	 */
+	eachGhost( iterator: ( Ghost ) => void ): void;
+
+	/**
+	 * Get the current change version (cv) that this channel has synced.
+	 *
+	 * @function
+	 * @name GhostStore#getChangeVersion
+	 * @returns {Promise<String>} - the current change version for the bucket
+	 */
+	getChangeVersion(): Promise<string>;
+
+	/**
+	 * Set the current change version.
+	 *
+	 * @function
+	 * @name GhostStore#setChangeVersion
+	 * @param {string} changeVersion - new change version
+	 * @returns {Promise<Void>} - resolves once the change version is saved
+	 */
+	setChangeVersion( changeVersion: string ): Promise<void>;
+}
+
 const jsondiff = new JSONDiff( {list_diff: false} );
 
 type LocalChange = {
@@ -43,12 +137,6 @@ type NetworkChangeErrorResponse = {
 	d: ?{},
 	hasSentFullObject?: boolean
 };
-
-type Ghost = {
-	key: string,
-	version: number,
-	data: {}
-}
 
 class ChangeError extends Error {
 	code: number;
@@ -325,94 +413,6 @@ internal.indexingComplete = function() {
 	this.index_last_id = null;
 	this.index_cv = null;
 	this.emit( 'ready' )
-}
-
-/**
- * A ghost represents a version of a bucket object as known by Simperium
- *
- * Generally a client will keep the last known ghost stored locally for efficient
- * diffing and patching of Simperium change operations.
- *
- * @typedef {Object} Ghost
- * @property {Number} version - the ghost's version
- * @property {String} key - the simperium bucket object id this ghost is for
- * @property {Object} data - the data for the given ghost version
- */
-
-/**
- * Callback function used by the ghost store to iterate over existing ghosts
- *
- * @callback ghostIterator
- * @param {Ghost} - the current ghost
- */
-
-/**
- * A GhostStore provides the store mechanism for ghost data that the Channel
- * uses to maintain syncing state and producing change operations for
- * Bucket objects.
- *
- * @interface GhostStore
- */
-interface GhostStore {
-	/**
-	 * Retrieve a Ghost for the given bucket object id
-	 *
-	 * @function
-	 * @name GhostStore#get
-	 * @param {String} id - bucket object id
-	 * @returns {Promise<Ghost>} - the ghost for this object
-	 */
-	 get( id: string ): Promise<Ghost>;
-
-	/**
-	 * Save a ghost in the store.
-	 *
-	 * @function
-	 * @name GhostStore#put
-	 * @param {String} id - bucket object id
-	 * @param {Number} version - version of ghost data
-	 * @param {Object} data - object literal to save as this ghost's data for this version
-	 * @returns {Promise<Ghost>} - the ghost for this object
-	 */
-	 put(id: string, version: number, data: {}): Promise<Ghost>;
-
-	/**
-	 * Delete a Ghost from the store.
-	 *
-	 * @function
-	 * @name GhostStore#remove
-	 * @param {String} id - bucket object id
-	 * @returns {Promise<Ghost>} - the ghost for this object
-	 */
-	 remove(id: string): Promise<Ghost>;
-
-	/**
-	 * Iterate over existing Ghost objects with the given callback.
-	 *
-	 * @function
-	 * @name GhostStore#eachGhost
-	 * @param {ghostIterator} - function to run against each ghost
-	 */
-	 eachGhost(iterator: (Ghost) => void): void;
-
-	/**
-	 * Get the current change version (cv) that this channel has synced.
-	 *
-	 * @function
-	 * @name GhostStore#getChangeVersion
-	 * @returns {Promise<String>} - the current change version for the bucket
-	 */
-	 getChangeVersion(): Promise<string>;
-
-	/**
-	 * Set the current change version.
-	 *
-	 * @function
-	 * @name GhostStore#setChangeVersion
-	 * @param {string} changeVersion - new change version
-	 * @returns {Promise<Void>} - resolves once the change version is saved
-	 */
-	 setChangeVersion(changeVersion: string): Promise<void>;
 }
 
 /**
@@ -744,11 +744,11 @@ const asNetworkChange = ( changeMessage: ChangeMessage ): NetworkChange => {
 	}
 
 	if ( ! changeMessage.cv ) {
-		throw new ProtocolError( 'netwock change missing change version (cv)');
+		throw new ProtocolError( 'netwock change missing change version (cv)' );
 	}
 
 	if ( ! changeMessage.id ) {
-		throw new ProtocolError( 'network change missing id');
+		throw new ProtocolError( 'network change missing id' );
 	}
 
 	if ( operation === '-' ) {
