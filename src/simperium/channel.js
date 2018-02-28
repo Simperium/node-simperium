@@ -10,12 +10,6 @@ import uuid from 'uuid/v4'
 
 const { EventEmitter } = events;
 
-type Ghost = {
-	key: string,
-	version: number,
-	data: {}
-}
-
 /**
  * A ghost represents a version of a bucket object as known by Simperium
  *
@@ -27,6 +21,11 @@ type Ghost = {
  * @property {String} key - the simperium bucket object id this ghost is for
  * @property {Object} data - the data for the given ghost version
  */
+type Ghost = {
+	key: string,
+	version: number,
+	data: {}
+}
 
 /**
  * Callback function used by the ghost store to iterate over existing ghosts
