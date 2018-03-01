@@ -1,14 +1,10 @@
-var diff_match_patch = require('./diff_match_patch');
+import diff_match_patch, { DIFF_DELETE, DIFF_EQUAL, DIFF_INSERT } from './diff_match_patch';
 
 // stolen from https://raw.github.com/Simperium/jsondiff/master/src/jsondiff.js
-(function() {
-  var jsondiff,
-    __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
-    __hasProp = Object.prototype.hasOwnProperty;
+const __hasProp = Object.prototype.hasOwnProperty;
+const __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
-  jsondiff = (function() {
-
-    function jsondiff(options) {
+    export default function jsondiff(options) {
       this.options = options || {list_diff: true};
       this.patch_apply_with_offsets = __bind(this.patch_apply_with_offsets, this);
       this.transform_object_diff = __bind(this.transform_object_diff, this);
@@ -611,11 +607,3 @@ var diff_match_patch = require('./diff_match_patch');
     text = text.substring(nullPadding.length, text.length - nullPadding.length);
     return text;
   };
-
-    return jsondiff;
-
-  })();
-
-  module.exports = jsondiff;
-
-}).call();
