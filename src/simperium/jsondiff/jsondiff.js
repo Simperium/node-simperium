@@ -1,10 +1,12 @@
 import diff_match_patch, { DIFF_DELETE, DIFF_EQUAL, DIFF_INSERT } from './diff_match_patch';
 
+export { jsondiff as JSONDiff };
+
 // stolen from https://raw.github.com/Simperium/jsondiff/master/src/jsondiff.js
 const __hasProp = Object.prototype.hasOwnProperty;
 const __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
-    export default function jsondiff(options) {
+    function jsondiff(options: ?{ list_diff: boolean } ) {
       this.options = options || {list_diff: true};
       this.patch_apply_with_offsets = __bind(this.patch_apply_with_offsets, this);
       this.transform_object_diff = __bind(this.transform_object_diff, this);

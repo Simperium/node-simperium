@@ -3,3 +3,4 @@ src/simperium/jsondiff
 lib/
 sample/
 examples/
+flow-typed/

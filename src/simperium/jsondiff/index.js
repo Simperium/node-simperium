@@ -1,8 +1,9 @@
-import JSONDiff from './jsondiff'
-import diff_match_patch from './diff_match_patch'
+// @flow
+import { JSONDiff } from './jsondiff'
+import type { ObjectOperationSet } from './jsondiff';
 
-export { JSONDiff as jsondiff, diff_match_patch }
+export type { ObjectOperationSet }
 
-export default function init( options ) {
-	return new JSONDiff( options );
-}
+const jsondiff = new JSONDiff( { list_diff: false } );
+
+export { jsondiff as default };
