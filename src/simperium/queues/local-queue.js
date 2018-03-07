@@ -91,8 +91,8 @@ interface GhostStore {
 
 export default class LocalQueue extends EventEmitter {
 	store: GhostStore;
-	sent: { [objectId: string]: BucketOperation };
-	queues: { [objectId: string]: BucketOperation[] };
+	sent: { [objectId: string]: ?BucketOperation };
+	queues: { [objectId: string]: ?BucketOperation[] };
 	ready: boolean
 
 	/*
@@ -174,12 +174,19 @@ export default class LocalQueue extends EventEmitter {
 			Object.keys( this.sent ).length > 0;
 	};
 
+	/**
+	 * Removes pending and sent changes from the queue and returns them
+	 * @param {string} id - bucket object id
+	 * @returns {BucketOperation[]} list of changes removed from the queue
+	 */
 	dequeueChangesFor( id: string ) {
-		var changes = [], sent = this.sent[id], queue = this.queues[id];
+		let changes: BucketOperation[] = [];
+		const sent = this.sent[id];
+		const queue = this.queues[id];
 
 		if ( sent ) {
 			delete this.sent[id];
-			changes.push( sent );
+			changes = changes.concat( sent );
 		}
 
 		if ( queue ) {
@@ -190,6 +197,11 @@ export default class LocalQueue extends EventEmitter {
 		return changes;
 	};
 
+	/**
+	 * Send the changes queued for the given bucket object
+	 * @emits wait
+	 * @param {string} id - bucket object id
+	 */
 	processQueue( id: string ) {
 		const queue = this.queues[id];
 
@@ -213,6 +225,12 @@ export default class LocalQueue extends EventEmitter {
 		} );
 	}
 
+	/**
+	 * Sends queued changes if any to simperium for the given bucket object id
+	 *
+	 * @param {string} id - bucket object id to send changes for
+	 * @param {*} ghost - the current ghost for the given bucket object
+	 */
 	compressAndSend( id: string, ghost: Ghost ) {
 		const changes = this.queues[id];
 		// the starting point of any changes will be the ghost's current data
@@ -221,6 +239,9 @@ export default class LocalQueue extends EventEmitter {
 		// a change was sent before we could compress and send
 		if ( this.sent[id] ) {
 			this.emit( 'wait', id );
+			return;
+		}
+		if ( !changes ) {
 			return;
 		}
 
@@ -263,6 +284,9 @@ export default class LocalQueue extends EventEmitter {
 		this.emit( 'send', change );
 	}
 
+	/**
+	 * Retries sending any previously sent changes that have not been acknowledged by simperium
+	 */
 	resendSentChanges() {
 		for ( let ccid in this.sent ) {
 			this.emit( 'send', this.sent[ccid] )
