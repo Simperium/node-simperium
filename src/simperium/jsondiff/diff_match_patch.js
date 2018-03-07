@@ -1,4 +1,3 @@
-module.exports = diff_match_patch;
 
 /**
  * Diff Match and Patch
@@ -29,7 +28,7 @@ module.exports = diff_match_patch;
  * Class containing the diff, match and patch methods.
  * @constructor
  */
-function diff_match_patch() {
+export default function diff_match_patch() {
 
   // Defaults.
   // Redefine these in your program to override the defaults.
@@ -65,9 +64,9 @@ function diff_match_patch() {
  * [[DIFF_DELETE, 'Hello'], [DIFF_INSERT, 'Goodbye'], [DIFF_EQUAL, ' world.']]
  * which means: delete 'Hello', add 'Goodbye' and keep ' world.'
  */
-var DIFF_DELETE = -1;
-var DIFF_INSERT = 1;
-var DIFF_EQUAL = 0;
+export const DIFF_DELETE = -1;
+export const DIFF_INSERT = 1;
+export const DIFF_EQUAL = 0;
 
 /** @typedef {{0: number, 1: string}} */
 diff_match_patch.Diff;
@@ -2183,13 +2182,3 @@ diff_match_patch.patch_obj.prototype.toString = function() {
   }
   return text.join('').replace(/%20/g, ' ');
 };
-
-
-// Export these global variables so that they survive Google's JS compiler.
-// In a browser, 'this' will be 'window'.
-// Users of node.js should 'require' the uncompressed version since Google's
-// JS compiler may break the following exports for non-browser environments.
-module.exports['diff_match_patch'] = diff_match_patch;
-module.exports['DIFF_DELETE'] = DIFF_DELETE;
-module.exports['DIFF_INSERT'] = DIFF_INSERT;
-module.exports['DIFF_EQUAL'] = DIFF_EQUAL;

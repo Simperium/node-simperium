@@ -2,10 +2,7 @@
 import { format, inherits } from 'util'
 import { EventEmitter } from 'events'
 import { parseMessage, parseVersionMessage, change as change_util } from './util'
-import JSONDiff from './jsondiff'
 import { v4 as uuid } from 'uuid'
-
-const jsondiff = new JSONDiff( {list_diff: false} );
 
 const UNKNOWN_CV = '?';
 const CODE_INVALID_VERSION = 405;
@@ -128,7 +125,7 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 		// apply the transformed patch and emit the update
 		if ( transformed ) {
 			patch = transformed;
-			update = jsondiff.apply_object_diff( data, transformed );
+			update = change_util.apply( transformed, data );
 			// queue up the new change
 			change = change_util.modify( id, version, patch );
 			this.localQueue.queue( change );
@@ -218,7 +215,7 @@ internal.applyChange = function( change, ghost ) {
 
 		original = ghost.data;
 		patch = change.v;
-		modified = jsondiff.apply_object_diff( original, patch );
+		modified = change_util.apply( patch, original );
 		return internal.updateObjectVersion.call( this, change.id, change.ev, modified, original, patch, acknowledged )
 			.then( updateChangeVersion );
 	} else if ( change.o === operation.REMOVE ) {
@@ -842,7 +839,7 @@ LocalQueue.prototype.compressAndSend = function( id, ghost ) {
 			break;
 		}
 
-		target = jsondiff.apply_object_diff( target, c.v );
+		target = change_util.apply( c.v, target );
 	}
 
 	type = target === null ? change_util.type.REMOVE : change_util.type.MODIFY;
