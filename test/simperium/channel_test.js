@@ -10,7 +10,7 @@ import { v4 as uuid } from 'uuid'
 import Bucket from '../../src/simperium/bucket'
 import mockBucketStore from './mock_bucket_store'
 
-const differ = jsondiff()
+const differ = jsondiff
 const diff = differ.object_diff.bind( differ )
 const cycle = ( ... fns ) => ( ... args ) => {
 	const [ head, ... rest ] = fns

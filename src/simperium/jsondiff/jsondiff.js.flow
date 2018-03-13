@@ -1,0 +1,29 @@
+// @flow
+export type Options = { list_diff: boolean };
+
+declare export class JSONDiff {
+  constructor( options: ?Options): JSONDiff;
+  transform_object_diff( workingChanges: ObjectOperationSet, upstreamChanges: ObjectOperationSet, base: {}): ObjectOperationSet;
+  apply_object_diff( changes: ObjectOperationSet, base: {}): {};
+  object_diff( base: {}, modified: {} ): ObjectOperationSet;
+}
+
+export type ObjectOperationSet = { [key: string]: Operation }
+type ListOperationSet = { [index: number]: Operation };
+
+export type Operation
+  = AddOperation
+  | RemoveOperation
+  | ReplaceOperation
+  | IncrementOperation
+  | ListOperation
+  | ObjectOperation
+  | DiffMatchPatchOperation
+
+type AddOperation = { o: '+', v: any };
+type RemoveOperation = { o: '-' };
+type ReplaceOperation = { o: 'r', v: any };
+type IncrementOperation = { o: 'I', v: number };
+type ListOperation = { o: 'L', v: { [index: number]: Operation } };
+type ObjectOperation = { o: 'O', v: ObjectOperationSet };
+type DiffMatchPatchOperation = { o: 'd', v: string };

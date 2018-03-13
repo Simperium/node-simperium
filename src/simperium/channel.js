@@ -2,10 +2,7 @@
 import { format, inherits } from 'util'
 import { EventEmitter } from 'events'
 import { parseMessage, parseVersionMessage, change as change_util } from './util'
-import JSONDiff from './jsondiff'
 import { v4 as uuid } from 'uuid'
-
-const jsondiff = new JSONDiff( {list_diff: false} );
 
 const UNKNOWN_CV = '?';
 const CODE_INVALID_VERSION = 405;
@@ -106,7 +103,7 @@ internal.removeAndSend = function( id ) {
 /**
  * Updates the ghost store with the updated ghost data based on the data that
  * comes from applying the patch to the original.
- * 
+ *
  * @param { string } id - the bucket object key for the object being updated
  * @param { number } version - the version number the ghost is being updated to
  * @param { Object } data - the new data for the ghost for this version
@@ -144,7 +141,7 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 				const patch = transformed,
 					change = change_util.modify( id, version, patch );
 
-				update = jsondiff.apply_object_diff( data, transformed );
+				update = change_util.apply( transformed, data );
 				// queue up the new change
 				this.localQueue.queue( change );
 			}
@@ -231,7 +228,7 @@ internal.applyChange = function( change, ghost ) {
 
 		original = ghost.data;
 		patch = change.v;
-		modified = jsondiff.apply_object_diff( original, patch );
+		modified = change_util.apply( patch, original );
 		return internal.updateObjectVersion.call( this, change.id, change.ev, modified, original, patch, acknowledged )
 			.then( updateChangeVersion );
 	} else if ( change.o === operation.REMOVE ) {
@@ -357,7 +354,6 @@ internal.indexingComplete = function() {
  * @name GhostStore#setChangeVersion
  * @returns {Promise<Void>} - resolves once the change version is saved
  */
-
 
 /**
  * Maintains syncing state for a Simperium bucket.
@@ -508,6 +504,8 @@ Channel.prototype.getVersion = function( id ) {
 
 /**
  * Subscription interface for network changes.
+ * @param { Subscriber } subscriber - function used to subscribe to network changes modifying a
+ *                                    bucket object
  */
 Channel.prototype.subscribe = function( subscriber ) {
 	this.subscriber = subscriber;
@@ -873,7 +871,7 @@ LocalQueue.prototype.compressAndSend = function( id, ghost ) {
 			break;
 		}
 
-		target = jsondiff.apply_object_diff( target, c.v );
+		target = change_util.apply( c.v, target );
 	}
 
 	type = target === null ? change_util.type.REMOVE : change_util.type.MODIFY;
