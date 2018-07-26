@@ -6,6 +6,8 @@ script:
 # unit tests with coverage report
 - npm run test:coverage
 node_js:
+- '10'
+- '9'
 - '8'
 - '7'
 - '6'
