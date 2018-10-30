@@ -150,7 +150,7 @@ export default function Bucket( name, storeProvider, channel ) {
 	this.onChannelIndex = this.emit.bind( this, 'index' );
 	this.onChannelError = this.emit.bind( this, 'error' );
 	this.onChannelUpdate = ( id, data, original, patch, isIndexing ) => {
-		this.update( id, data, original, patch, isIndexing, { sync: false } );
+		this.update( { id, data, original, patch, isIndexing }, { sync: false } );
 	};
 
 	this.onChannelIndexingStateChange = ( isIndexing ) => {
@@ -209,13 +209,13 @@ Bucket.prototype.reload = function() {
  * Stores an object in the bucket and syncs it to simperium. Generates an
  * object ID to represent the object in simperium.
  *
- * @param {Object} object - plain js object literal to be saved/synced
+ * @param {Object} data - plain js object literal to be saved/synced
  * @param {?bucketStoreGetCallback} callback - runs when object has been saved
  * @return {Promise<Object>} data stored in the bucket
  */
-Bucket.prototype.add = function( object, callback ) {
+Bucket.prototype.add = function( data, callback ) {
 	var id = uuid();
-	return this.update( id, object, null, null, null, null, callback );
+	return this.update( { id, data }, callback );
 };
 
 /**
@@ -232,17 +232,18 @@ Bucket.prototype.get = function( id, callback ) {
 /**
  * Update the bucket object of `id` with the given data.
  *
- * @param {String} id - the bucket id for the object to update
- * @param {Object} data - object literal to replace the object data with
- * @param {Object} original - the original object before the udpate
- * @param {Object} patch - the JSONDiff patch to apply to the object
- * @param {Boolean} isIndexing - true if the bucket is currently indexing
+ * @param {Object} args - the function arguments
+ * @param {String} [args.id] - the bucket id for the object to update
+ * @param {Object} [args.data] - object literal to replace the object data with
+ * @param {Object} [args.original] - the original object before the udpate
+ * @param {Object} [args.patch] - the JSONDiff patch to apply to the object
+ * @param {Boolean} [args.isIndexing] - true if the bucket is currently indexing
  * @param {Object} [options] - optional settings
  * @param {Boolean} [options.sync=true] - false if object should not be synced with this update
  * @param {?bucketStoreGetCallback} callback - executed when object is updated localy
  * @returns {Promise<Object>} - update data
  */
-Bucket.prototype.update = function( id, data, original, patch, isIndexing, options, callback ) {
+Bucket.prototype.update = function( { id, data, original, patch, isIndexing = false }, options, callback ) {
 	if ( typeof options === 'function' ) {
 		callback = options;
 		options = { sync: true };
@@ -306,7 +307,7 @@ Bucket.prototype.getVersion = function( id, callback ) {
  */
 Bucket.prototype.touch = function( id, callback ) {
 	const task = this.storeAPI.get( id )
-		.then( object => this.update( object.id, object.data ) );
+		.then( object => this.update( { id: object.id, data: object.data } ) );
 
 	return deprecateCallback( callback, task );
 };

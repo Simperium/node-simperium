@@ -108,7 +108,8 @@ describe( 'Channel', function() {
 				done();
 			} );
 
-			bucket.update( '12345', {content: 'Hola mundo!'} );
+			const updateArgs = {id: '12345', data: {content: 'Hola mundo!'}}
+			bucket.update( updateArgs );
 		} );
 
 		it( 'should not send a change with an empty diff', function( done ) {
@@ -121,7 +122,7 @@ describe( 'Channel', function() {
 					channel.once( 'unmodified', function() {
 						done();
 					} );
-					bucket.update( 'thing', data );
+					bucket.update( {id: 'thing', data} );
 				} );
 		} );
 
@@ -131,12 +132,12 @@ describe( 'Channel', function() {
 				checkSent = function() {
 					throw new Error( 'Sent too many changes' );
 				},
-				objectId = '123456';
+				id = '123456';
 
 			channel.on( 'send', fn.counts( 1, checkSent ) );
 
 			channel.on( 'send', function() {
-				bucket.update( objectId, data2 );
+				bucket.update( { id, data: data2 } );
 			} )
 
 			channel.localQueue.on( 'wait', function( id ) {
@@ -144,8 +145,8 @@ describe( 'Channel', function() {
 				done();
 			} );
 
-			objectId = '123456';
-			bucket.update( objectId, data );
+			const objectId = '123456';
+			bucket.update( {id: objectId, data} );
 		} );
 
 		it( 'should acknowledge sent change', function( done ) {
@@ -160,7 +161,7 @@ describe( 'Channel', function() {
 				acknowledge( channel, msg );
 			} );
 
-			bucket.update( 'mock-id', data );
+			bucket.update( { id: 'mock-id', data } );
 		} );
 
 		it( 'should ignore duplicate change error if nothing to acknowledge', ( done ) => {
@@ -225,13 +226,14 @@ describe( 'Channel', function() {
 
 			channel.localQueue.on( 'wait', validate );
 
+			const id = '123';
 			channel.once( 'send', function() {
-				bucket.update( '123', {title: 'hello again world'} );
-				bucket.remove( '123' );
+				bucket.update( {id, data: {title: 'hello again world'}} );
+				bucket.remove( id );
 			} );
 
 			store.put( '123', 3, {title: 'hello world'} ).then( function() {
-				bucket.update( '123', {title: 'goodbye world'} );
+				bucket.update( {id, data: {title: 'goodbye world'}} );
 			} );
 		} );
 
@@ -266,7 +268,7 @@ describe( 'Channel', function() {
 				}, reject );
 			} );
 
-			bucket.update( key, {title: 'hello world'}, null, null, null, function() {
+			bucket.update( {id: key, data: {title: 'hello world'}}, function() {
 				channel.handleMessage( 'c:' + JSON.stringify( [{
 					o: '-', ev: 1, cv: 'cv1', id: key
 				}] ) );
@@ -319,8 +321,9 @@ describe( 'Channel', function() {
 				} );
 			} );
 
-			store.put( '123', 3, {title: 'hello world'} ).then( function() {
-				bucket.update( '123', {title: 'goodbye world!!'} );
+			const id = '123';
+			store.put( id, 3, {title: 'hello world'} ).then( function() {
+				bucket.update( {id, data: {title: 'goodbye world!!'}} );
 			} );
 		} );
 
@@ -352,7 +355,7 @@ describe( 'Channel', function() {
 			}] ) );
 
 			// We're changing "Hello world" to "Goodbye world"
-			bucket.update( key, {title: 'Goodbye world'} );
+			bucket.update( {id: key, data: {title: 'Goodbye world'}} );
 		} ) );
 
 		it( 'should emit errors on the bucket instance', ( done ) => {
@@ -426,7 +429,7 @@ describe( 'Channel', function() {
 					acknowledge( channel, msg );
 				} );
 
-				bucket.update( 'mock-id', data );
+				bucket.update( {id: 'mock-id', data} );
 			} );
 
 			it( 'should get version', ( done ) => {

@@ -14,7 +14,7 @@ describe( 'default store', () => {
 		const id = 'thing',
 			data = {one: 'two'};
 
-		return bucket.update( id, data )
+		return bucket.update( {id, data} )
 			.then( () => bucket.get( id ) )
 			.then( ( object ) => {
 				deepEqual( object, { data, id } );
@@ -25,7 +25,7 @@ describe( 'default store', () => {
 		const id = 'thing',
 			data = {one: 'two'}
 
-		return bucket.update( id, data )
+		return bucket.update( {id, data} )
 			.then( () => bucket.get( id ) )
 			.then( ( object ) => {
 				deepEqual( object, { data, id } );
