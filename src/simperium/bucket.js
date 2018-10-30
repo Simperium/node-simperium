@@ -149,8 +149,8 @@ export default function Bucket( name, storeProvider, channel ) {
 	 */
 	this.onChannelIndex = this.emit.bind( this, 'index' );
 	this.onChannelError = this.emit.bind( this, 'error' );
-	this.onChannelUpdate = ( id, data ) => {
-		this.update( id, data, { sync: false } );
+	this.onChannelUpdate = ( id, data, original, patch, isIndexing ) => {
+		this.update( id, data, original, patch, isIndexing, { sync: false } );
 	};
 
 	this.onChannelIndexingStateChange = ( isIndexing ) => {
@@ -215,7 +215,7 @@ Bucket.prototype.reload = function() {
  */
 Bucket.prototype.add = function( object, callback ) {
 	var id = uuid();
-	return this.update( id, object, callback );
+	return this.update( id, object, null, null, null, null, callback );
 };
 
 /**
@@ -234,12 +234,15 @@ Bucket.prototype.get = function( id, callback ) {
  *
  * @param {String} id - the bucket id for the object to update
  * @param {Object} data - object literal to replace the object data with
+ * @param {Object} original - the original object before the udpate
+ * @param {Object} patch - the JSONDiff patch to apply to the object
+ * @param {Boolean} isIndexing - true if the bucket is currently indexing
  * @param {Object} [options] - optional settings
  * @param {Boolean} [options.sync=true] - false if object should not be synced with this update
  * @param {?bucketStoreGetCallback} callback - executed when object is updated localy
  * @returns {Promise<Object>} - update data
  */
-Bucket.prototype.update = function( id, data, options, callback ) {
+Bucket.prototype.update = function( id, data, original, patch, isIndexing, options, callback ) {
 	if ( typeof options === 'function' ) {
 		callback = options;
 		options = { sync: true };
@@ -251,7 +254,7 @@ Bucket.prototype.update = function( id, data, options, callback ) {
 
 	const task = this.storeAPI.update( id, data, this.isIndexing )
 		.then( bucketObject => {
-			this.emit( 'update', id, bucketObject.data );
+			this.emit( 'update', id, bucketObject.data, original, patch, isIndexing );
 			this.channel.update( bucketObject, options.sync );
 			return bucketObject;
 		} );

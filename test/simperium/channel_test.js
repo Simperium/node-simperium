@@ -266,7 +266,7 @@ describe( 'Channel', function() {
 				}, reject );
 			} );
 
-			bucket.update( key, {title: 'hello world'}, function() {
+			bucket.update( key, {title: 'hello world'}, null, null, null, function() {
 				channel.handleMessage( 'c:' + JSON.stringify( [{
 					o: '-', ev: 1, cv: 'cv1', id: key
 				}] ) );
