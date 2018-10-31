@@ -234,7 +234,7 @@ Bucket.prototype.get = function( id, callback ) {
  *
  * @param {String} id - the bucket id for the object to update
  * @param {Object} data - object literal to replace the object data with
-  * @param {Object} updateInfo - object containing data about a remote change
+ * @param {Object} remoteUpdateInfo - object containing data about a remote change
  * @param {Object} [updateInfo.original] - the original object before the udpate
  * @param {Object} [updateInfo.patch] - the JSONDiff patch to apply to the object
  * @param {Boolean} [updateInfo.isIndexing] - true if the bucket is currently indexing
@@ -243,10 +243,10 @@ Bucket.prototype.get = function( id, callback ) {
  * @param {?bucketStoreGetCallback} callback - executed when object is updated localy
  * @returns {Promise<Object>} - update data
  */
-Bucket.prototype.update = function( id, data, updateInfo, options, callback ) {
+Bucket.prototype.update = function( id, data, remoteUpdateInfo, options, callback ) {
 	// Callback could be 3rd or 4th argument
-	if ( typeof updateInfo === 'function' ) {
-		callback = updateInfo;
+	if ( typeof remoteUpdateInfo === 'function' ) {
+		callback = remoteUpdateInfo;
 		options = { sync: true };
 	} else if ( typeof options === 'function' ) {
 		callback = options;
@@ -259,7 +259,7 @@ Bucket.prototype.update = function( id, data, updateInfo, options, callback ) {
 
 	const task = this.storeAPI.update( id, data, this.isIndexing )
 		.then( bucketObject => {
-			this.emit( 'update', id, bucketObject.data, updateInfo );
+			this.emit( 'update', id, bucketObject.data, remoteUpdateInfo );
 			this.channel.update( bucketObject, options.sync );
 			return bucketObject;
 		} );
