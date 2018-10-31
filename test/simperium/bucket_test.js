@@ -39,7 +39,7 @@ describe( 'Bucket', () => {
 		const id = 'thing',
 			data = {one: 'two'};
 
-		bucket.update( { id, data }, function() {
+		bucket.update( id, data, function() {
 			bucket.get( id, function( err, savedObject ) {
 				deepEqual( data, savedObject );
 				done();
@@ -51,7 +51,7 @@ describe( 'Bucket', () => {
 		const id = 'thing',
 			data = {one: 'two'}
 
-		bucket.update( { id, data }, function() {
+		bucket.update( id, data, function() {
 			bucket.get( id, function( err, savedObject ) {
 				deepEqual( data, savedObject );
 				done();

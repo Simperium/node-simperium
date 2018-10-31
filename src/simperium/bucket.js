@@ -150,7 +150,7 @@ export default function Bucket( name, storeProvider, channel ) {
 	this.onChannelIndex = this.emit.bind( this, 'index' );
 	this.onChannelError = this.emit.bind( this, 'error' );
 	this.onChannelUpdate = ( id, data, original, patch, isIndexing ) => {
-		this.update( { id, data, original, patch, isIndexing }, { sync: false } );
+		this.update( id, data, { original, patch, isIndexing }, { sync: false } );
 	};
 
 	this.onChannelIndexingStateChange = ( isIndexing ) => {
@@ -232,20 +232,21 @@ Bucket.prototype.get = function( id, callback ) {
 /**
  * Update the bucket object of `id` with the given data.
  *
- * @param {Object} args - the function arguments
- * @param {String} [args.id] - the bucket id for the object to update
- * @param {Object} [args.data] - object literal to replace the object data with
- * @param {Object} [args.original] - the original object before the udpate
- * @param {Object} [args.patch] - the JSONDiff patch to apply to the object
- * @param {Boolean} [args.isIndexing] - true if the bucket is currently indexing
+ * @param {String} id - the bucket id for the object to update
+ * @param {Object} data - object literal to replace the object data with
+  * @param {Object} updateInfo - object containing data about a remote change
+ * @param {Object} [updateInfo.original] - the original object before the udpate
+ * @param {Object} [updateInfo.patch] - the JSONDiff patch to apply to the object
+ * @param {Boolean} [updateInfo.isIndexing] - true if the bucket is currently indexing
  * @param {Object} [options] - optional settings
  * @param {Boolean} [options.sync=true] - false if object should not be synced with this update
  * @param {?bucketStoreGetCallback} callback - executed when object is updated localy
  * @returns {Promise<Object>} - update data
  */
-Bucket.prototype.update = function( { id, data, original, patch, isIndexing = false }, options, callback ) {
-	if ( typeof options === 'function' ) {
-		callback = options;
+Bucket.prototype.update = function( id, data, updateInfo, options, callback ) {
+	// Callback could be 3rd or 4th argument
+	if ( typeof updateInfo === 'function' || typeof options === 'function' ) {
+		callback = typeof updateInfo === 'function' ? updateInfo : options;
 		options = { sync: true };
 	}
 
@@ -255,7 +256,7 @@ Bucket.prototype.update = function( { id, data, original, patch, isIndexing = fa
 
 	const task = this.storeAPI.update( id, data, this.isIndexing )
 		.then( bucketObject => {
-			this.emit( 'update', id, bucketObject.data, original, patch, isIndexing );
+			this.emit( 'update', id, bucketObject.data, updateInfo );
 			this.channel.update( bucketObject, options.sync );
 			return bucketObject;
 		} );
