@@ -37,11 +37,11 @@ describe( 'Bucket', () => {
 
 	it( 'should store object update callback', ( done ) => {
 		const id = 'thing',
-			object = {one: 'two'};
+			data = {one: 'two'};
 
-		bucket.update( id, object, function() {
+		bucket.update( id, data, function() {
 			bucket.get( id, function( err, savedObject ) {
-				deepEqual( object, savedObject );
+				deepEqual( data, savedObject );
 				done();
 			} );
 		} );
@@ -49,11 +49,11 @@ describe( 'Bucket', () => {
 
 	it( 'should update with options callback', ( done ) => {
 		const id = 'thing',
-			object = {one: 'two'}
+			data = {one: 'two'}
 
-		bucket.update( id, object, {}, function() {
+		bucket.update( id, data, function() {
 			bucket.get( id, function( err, savedObject ) {
-				deepEqual( object, savedObject );
+				deepEqual( data, savedObject );
 				done();
 			} )
 		} )
@@ -99,4 +99,3 @@ describe( 'Bucket', () => {
 		} );
 	} );
 } );
-

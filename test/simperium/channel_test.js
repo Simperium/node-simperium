@@ -108,7 +108,7 @@ describe( 'Channel', function() {
 				done();
 			} );
 
-			bucket.update( '12345', {content: 'Hola mundo!'} );
+			bucket.update( '12345', {content: 'Hola mundo!'});
 		} );
 
 		it( 'should not send a change with an empty diff', function( done ) {
@@ -131,20 +131,20 @@ describe( 'Channel', function() {
 				checkSent = function() {
 					throw new Error( 'Sent too many changes' );
 				},
-				objectId = '123456';
+				id = '123456';
 
 			channel.on( 'send', fn.counts( 1, checkSent ) );
 
 			channel.on( 'send', function() {
-				bucket.update( objectId, data2 );
+				bucket.update( id, data2 );
 			} )
 
+			const objectId = '123456';
 			channel.localQueue.on( 'wait', function( id ) {
 				equal( id, objectId );
 				done();
 			} );
 
-			objectId = '123456';
 			bucket.update( objectId, data );
 		} );
 
@@ -225,13 +225,14 @@ describe( 'Channel', function() {
 
 			channel.localQueue.on( 'wait', validate );
 
+			const id = '123';
 			channel.once( 'send', function() {
-				bucket.update( '123', {title: 'hello again world'} );
-				bucket.remove( '123' );
+				bucket.update( id, {title: 'hello again world'} );
+				bucket.remove( id );
 			} );
 
 			store.put( '123', 3, {title: 'hello world'} ).then( function() {
-				bucket.update( '123', {title: 'goodbye world'} );
+				bucket.update( id, {title: 'goodbye world'} );
 			} );
 		} );
 
@@ -319,8 +320,9 @@ describe( 'Channel', function() {
 				} );
 			} );
 
-			store.put( '123', 3, {title: 'hello world'} ).then( function() {
-				bucket.update( '123', {title: 'goodbye world!!'} );
+			const id = '123';
+			store.put( id, 3, {title: 'hello world'} ).then( function() {
+				bucket.update( id, {title: 'goodbye world!!'} );
 			} );
 		} );
 

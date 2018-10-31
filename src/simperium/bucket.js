@@ -149,8 +149,8 @@ export default function Bucket( name, storeProvider, channel ) {
 	 */
 	this.onChannelIndex = this.emit.bind( this, 'index' );
 	this.onChannelError = this.emit.bind( this, 'error' );
-	this.onChannelUpdate = ( id, data ) => {
-		this.update( id, data, { sync: false } );
+	this.onChannelUpdate = ( id, data, original, patch, isIndexing ) => {
+		this.update( id, data, { original, patch, isIndexing }, { sync: false } );
 	};
 
 	this.onChannelIndexingStateChange = ( isIndexing ) => {
@@ -209,13 +209,13 @@ Bucket.prototype.reload = function() {
  * Stores an object in the bucket and syncs it to simperium. Generates an
  * object ID to represent the object in simperium.
  *
- * @param {Object} object - plain js object literal to be saved/synced
+ * @param {Object} data - plain js object literal to be saved/synced
  * @param {?bucketStoreGetCallback} callback - runs when object has been saved
  * @return {Promise<Object>} data stored in the bucket
  */
-Bucket.prototype.add = function( object, callback ) {
+Bucket.prototype.add = function( data, callback ) {
 	var id = uuid();
-	return this.update( id, object, callback );
+	return this.update( id, data, callback );
 };
 
 /**
@@ -234,13 +234,21 @@ Bucket.prototype.get = function( id, callback ) {
  *
  * @param {String} id - the bucket id for the object to update
  * @param {Object} data - object literal to replace the object data with
+ * @param {Object} remoteUpdateInfo - object containing data about a remote change
+ * @param {Object} [updateInfo.original] - the original object before the udpate
+ * @param {Object} [updateInfo.patch] - the JSONDiff patch to apply to the object
+ * @param {Boolean} [updateInfo.isIndexing] - true if the bucket is currently indexing
  * @param {Object} [options] - optional settings
  * @param {Boolean} [options.sync=true] - false if object should not be synced with this update
  * @param {?bucketStoreGetCallback} callback - executed when object is updated localy
  * @returns {Promise<Object>} - update data
  */
-Bucket.prototype.update = function( id, data, options, callback ) {
-	if ( typeof options === 'function' ) {
+Bucket.prototype.update = function( id, data, remoteUpdateInfo, options, callback ) {
+	// Callback could be 3rd or 4th argument
+	if ( typeof remoteUpdateInfo === 'function' ) {
+		callback = remoteUpdateInfo;
+		options = { sync: true };
+	} else if ( typeof options === 'function' ) {
 		callback = options;
 		options = { sync: true };
 	}
@@ -251,7 +259,7 @@ Bucket.prototype.update = function( id, data, options, callback ) {
 
 	const task = this.storeAPI.update( id, data, this.isIndexing )
 		.then( bucketObject => {
-			this.emit( 'update', id, bucketObject.data );
+			this.emit( 'update', id, bucketObject.data, remoteUpdateInfo );
 			this.channel.update( bucketObject, options.sync );
 			return bucketObject;
 		} );
