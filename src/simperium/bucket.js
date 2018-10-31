@@ -215,7 +215,7 @@ Bucket.prototype.reload = function() {
  */
 Bucket.prototype.add = function( data, callback ) {
 	var id = uuid();
-	return this.update( { id, data }, callback );
+	return this.update( id, data, callback );
 };
 
 /**
@@ -245,8 +245,11 @@ Bucket.prototype.get = function( id, callback ) {
  */
 Bucket.prototype.update = function( id, data, updateInfo, options, callback ) {
 	// Callback could be 3rd or 4th argument
-	if ( typeof updateInfo === 'function' || typeof options === 'function' ) {
-		callback = typeof updateInfo === 'function' ? updateInfo : options;
+	if ( typeof updateInfo === 'function' ) {
+		callback = updateInfo;
+		options = { sync: true };
+	} else if ( typeof options === 'function' ) {
+		callback = options;
 		options = { sync: true };
 	}
 
@@ -308,7 +311,7 @@ Bucket.prototype.getVersion = function( id, callback ) {
  */
 Bucket.prototype.touch = function( id, callback ) {
 	const task = this.storeAPI.get( id )
-		.then( object => this.update( { id: object.id, data: object.data } ) );
+		.then( object => this.update( object.id, object.data ) );
 
 	return deprecateCallback( callback, task );
 };
