@@ -124,11 +124,19 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 
 		// apply the transformed patch and emit the update
 		if ( transformed ) {
-			patch = transformed;
-			update = change_util.apply( transformed, data );
-			// queue up the new change
-			change = change_util.modify( id, version, patch );
-			this.localQueue.queue( change );
+			try {
+				patch = transformed;
+				update = change_util.apply( transformed, data );
+				// queue up the new change
+				change = change_util.modify( id, version, patch );
+				this.localQueue.queue( change );
+			} catch (error) {
+				// Rebase failed. Fallback to using the local client's content and sync
+				// using the latest ghost.
+				const localObject = change_util.apply( localModifications, original );
+				const fallbackChange = change_util.buildChange( change_util.type.MODIFY, id, localObject, data);
+				this.localQueue.queue( fallbackChange );
+			}
 		}
 
 		notify = this.emit.bind( this, 'update', id, update, original, patch, this.isIndexing );
