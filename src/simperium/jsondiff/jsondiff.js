@@ -475,7 +475,18 @@ const __bind = function(fn, me){ return function(){ return fn.apply(me, argument
           a_patches = jsondiff.dmp.patch_make(sk, jsondiff.dmp.diff_fromDelta(sk, aop['v']));
           b_patches = jsondiff.dmp.patch_make(sk, jsondiff.dmp.diff_fromDelta(sk, bop['v']));
           b_text = (jsondiff.dmp.patch_apply(b_patches, sk))[0];
-          ab_text = (jsondiff.dmp.patch_apply(a_patches, b_text))[0];
+
+          const appliedPatch = jsondiff.dmp.patch_apply(a_patches, b_text);
+          const patchResults = appliedPatch[1];
+          // If we encounter bad merges, return null
+          for (let i=0; i < patchResults.length; i++) {
+            const result = patchResults[i];
+            if (result === false) {
+              return null;
+            }
+          }
+
+          ab_text = appliedPatch[0];
           if (ab_text !== b_text) {
             dmp_diffs = jsondiff.dmp.diff_main(b_text, ab_text);
             if (dmp_diffs.length > 2) {
@@ -489,8 +500,9 @@ const __bind = function(fn, me){ return function(){ return fn.apply(me, argument
             }
           }
         }
-        return ad_new;
       }
+
+      return ad_new;
     };
 
     jsondiff.prototype.patch_apply_with_offsets = function(patches, text, offsets) {};
