@@ -22,7 +22,7 @@
   "license": "BSD-2-Clause",
   "dependencies": {
     "uuid": "3.3.2",
-    "websocket": "1.0.29"
+    "websocket": "belcherj/WebSocket-Node#temp/master-build"
   },
   "devDependencies": {
     "@babel/cli": "7.5.5",
