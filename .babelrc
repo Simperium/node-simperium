@@ -1,7 +1,7 @@
 {
   "presets": [
-    [ "env", { "targets": { "browsers": "last 2 versions"} } ],
-    "flow"
+    ["@babel/preset-env", { "targets": { "browsers": "last 2 versions" } }],
+    "@babel/preset-flow"
   ],
-  "plugins": [ "transform-object-rest-spread" ]
+  "plugins": ["@babel/plugin-proposal-object-rest-spread"]
 }

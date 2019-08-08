@@ -13,7 +13,7 @@
   "scripts": {
     "flow": "flow",
     "test:coverage": "nyc npm test",
-    "test": "mocha --reporter dot --require babel-core/register test/**",
+    "test": "mocha --reporter dot --require @babel/register test/**",
     "babel": "babel -q -d lib/ src/",
     "lint": "eslint --quiet src/",
     "prepare": "npm run babel"
@@ -21,19 +21,20 @@
   "author": "",
   "license": "BSD-2-Clause",
   "dependencies": {
-    "uuid": "^3.2.1",
-    "websocket": "^1.0.22"
+    "uuid": "3.3.2",
+    "websocket": "1.0.29"
   },
   "devDependencies": {
-    "babel-cli": "^6.26.0",
-    "babel-core": "^6.26.0",
-    "babel-eslint": "^8.2.1",
-    "babel-plugin-transform-object-rest-spread": "^6.26.0",
-    "babel-preset-env": "^1.6.1",
-    "babel-preset-flow": "^6.23.0",
-    "eslint": "^4.17.0",
-    "flow-bin": "^0.66.0",
-    "mocha": "^5.0.0",
-    "nyc": "^13.0.1"
+    "@babel/cli": "7.5.5",
+    "@babel/core": "7.5.5",
+    "@babel/plugin-proposal-object-rest-spread": "7.5.5",
+    "@babel/preset-env": "7.5.5",
+    "@babel/preset-flow": "7.0.0",
+    "@babel/register": "^7.5.5",
+    "babel-eslint": "10.0.2",
+    "eslint": "6.1.0",
+    "flow-bin": "0.104.0",
+    "mocha": "6.2.0",
+    "nyc": "14.1.1"
   }
 }
