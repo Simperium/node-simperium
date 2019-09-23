@@ -416,6 +416,25 @@ describe( 'Channel', function() {
 			channel.handleMessage( 'c:' + JSON.stringify( [{error: 405, id: 'thing', ccids: ['abc']}] ) );
 		} );
 
+		it( 'should stop sending duplicate changes after receiving a 409', done => {
+			const change = {o: 'M', id: 'thing', sv: 1, ccid: 'duplicate', v: diff( {}, {key: 'value'} )};
+
+			channel.localQueue.queue( change );
+
+			channel.once( 'send', () => {
+				// we should sent out our change the first time
+				channel.on( 'error', done );
+				channel.localQueue.once( 'queued', () => done( 'Should not queue duplicate changes' ) );
+				channel.once( 'acknowledge', () => done() );
+
+				channel.handleMessage( 'c:' + JSON.stringify( [{
+					id: 'thing',
+					error: 409,
+					ccids: ['duplicate']
+				}] ) );
+			} );
+		} );
+
 		describe( 'with synced object', () => {
 			beforeEach( ( done ) => {
 				var data = { title: 'hola mundo' };

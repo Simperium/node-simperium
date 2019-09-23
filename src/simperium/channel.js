@@ -240,6 +240,7 @@ internal.handleChangeError = function( err, change, acknowledged ) {
 
 			break;
 		case CODE_DUPLICATE_CHANGE:
+			// no need to do anything else here - we already got this
 			internal.updateAcknowledged.call( this, acknowledged );
 			break;
 		case CODE_EMPTY_RESPONSE: // Change causes no change, just acknowledge it
