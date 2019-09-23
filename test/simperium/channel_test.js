@@ -420,7 +420,7 @@ describe( 'Channel', function() {
 			beforeEach( ( done ) => {
 				var data = { title: 'hola mundo' };
 
-				channel.on( 'acknowledge', function() {
+				channel.once( 'acknowledge', function() {
 					done();
 				} );
 
@@ -436,6 +436,37 @@ describe( 'Channel', function() {
 					equal( version, 1 );
 					done()
 				} );
+			} );
+
+			it( 'should handle a 409', ( done ) =>{
+				const expectedChange = { fake: 'change', ccid: 'dup-ccid', id: 'mock-id' };
+				channel.localQueue.sent['mock-id'] = { fake: 'change', ccid: 'dup-ccid', id: 'mock-id' };
+
+				/**
+				 * If the 409 is not handled the bucket will error
+				 */
+				bucket.once( 'error', ( e ) => {
+					done( e );
+				} );
+
+				/**
+				 * After successfully handling the 409 we should have an acknowledged
+				 * local change matching the duplicated ccid error.
+				 */
+				channel.once( 'acknowledge', ( id, change ) => {
+					try {
+						equal( id, 'mock-id' );
+						deepEqual( expectedChange, change )
+						done();
+					} catch ( error ) {
+						done( error );
+					}
+				} );
+
+				/**
+				 * Simulate receiving a 409
+				 */
+				channel.handleMessage( 'c:[{"error": 409, "ccids":["dup-ccid"], "id": "mock-id"}]' );
 			} );
 		} );
 	} );

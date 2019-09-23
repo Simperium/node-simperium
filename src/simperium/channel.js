@@ -6,6 +6,7 @@ import { v4 as uuid } from 'uuid'
 
 const UNKNOWN_CV = '?';
 const CODE_INVALID_VERSION = 405;
+const CODE_DUPLICATE_CHANGE = 409;
 const CODE_EMPTY_RESPONSE = 412;
 const CODE_INVALID_DIFF = 440;
 
@@ -237,6 +238,9 @@ internal.handleChangeError = function( err, change, acknowledged ) {
 				this.localQueue.dequeueChangesFor( change.id );
 			}
 
+			break;
+		case CODE_DUPLICATE_CHANGE:
+			internal.updateAcknowledged.call( this, acknowledged );
 			break;
 		case CODE_EMPTY_RESPONSE: // Change causes no change, just acknowledge it
 			internal.updateAcknowledged.call( this, acknowledged );
