@@ -420,7 +420,7 @@ describe( 'Channel', function() {
 			beforeEach( ( done ) => {
 				var data = { title: 'hola mundo' };
 
-				channel.on( 'acknowledge', function() {
+				channel.once( 'acknowledge', function() {
 					done();
 				} );
 
