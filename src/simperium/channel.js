@@ -104,7 +104,7 @@ internal.removeAndSend = function( id ) {
 
 // We've receive a full object from the network. Update the local instance and
 // notify of the new object version
-internal.updateObjectVersion = function( entityId, version, entityData, original, incomingPatch, localChange ) {
+internal.updateObjectVersion = function( entityId, version, entityData, ghostData, incomingPatch, localChange ) {
 	// if the change originated locally then all we need to do
 	// is update the ghost copy and acknowledge the update
 	if (localChange) {
@@ -126,15 +126,15 @@ internal.updateObjectVersion = function( entityId, version, entityData, original
 	 */
 
 	const queuedLocalChangeList = this.localQueue.dequeueChangesFor( entityId );
-	const compressedLocalChange = change_util.compressChanges( queuedLocalChangeList, original );
-	const patchWithLocalChanges = change_util.transform( compressedLocalChange, incomingPatch, original );
+	const compressedLocalChange = change_util.compressChanges( queuedLocalChangeList, ghostData );
+	const patchWithLocalChanges = change_util.transform( compressedLocalChange, incomingPatch, ghostData );
 	const transformedEntityData = change_util.apply( patchWithLocalChanges, entityData );
 	this.localQueue.queue( change_util.modify( entityId, version, patchWithLocalChanges ) );
 
 	return this
 		.store
 		.put( entityId, version, entityData )
-		.then( this.emit.bind( this, 'update', entityId, transformedEntityData, original, incomingPatch, this.isIndexing ) );
+		.then( this.emit.bind( this, 'update', entityId, transformedEntityData, ghostData, incomingPatch, this.isIndexing ) );
 };
 
 internal.removeObject = function( id, acknowledged ) {
