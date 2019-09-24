@@ -104,40 +104,38 @@ internal.removeAndSend = function( id ) {
 
 // We've receive a full object from the network. Update the local instance and
 // notify of the new object version
-internal.updateObjectVersion = function( id, version, data, original, patch, acknowledged ) {
-	var notify,
-		changes,
-		change,
-		patch,
-		localModifications,
-		remoteModifications,
-		transformed,
-		update;
-	// If it's not an ack, it's a change initiated on a different client
-	// we need to provide a way for the current client to respond to
-	// a potential conflict if it has modifications that have not been synced
-	if ( !acknowledged ) {
-		changes = this.localQueue.dequeueChangesFor( id );
-		localModifications = change_util.compressChanges( changes, original );
-		remoteModifications = patch;
-		transformed = change_util.transform( localModifications, remoteModifications, original );
-		update = data;
-
-		// apply the transformed patch and emit the update
-		if ( transformed ) {
-			patch = transformed;
-			update = change_util.apply( transformed, data );
-			// queue up the new change
-			change = change_util.modify( id, version, patch );
-			this.localQueue.queue( change );
-		}
-
-		notify = this.emit.bind( this, 'update', id, update, original, patch, this.isIndexing );
-	} else {
-		notify = internal.updateAcknowledged.bind( this, acknowledged );
+internal.updateObjectVersion = function( entityId, version, entityData, original, incomingPatch, localChange ) {
+	// if the change originated locally then all we need to do
+	// is update the ghost copy and acknowledge the update
+	if (localChange) {
+		return this
+			.store
+			.put( entityId, version, entityData )
+			.then( internal.updateAcknowledged.bind( this, localChange ) );
 	}
 
-	return this.store.put( id, version, data ).then( notify );
+	// If we don't have a record of the change already it means that
+	// it originated in another remote client
+	// we need to provide a way for the current client to respond to
+	// a potential conflict if it has modifications that have not been synced
+	const locallyQueuedChanges = this.localQueue.dequeueChangesFor( entityId );
+	const localModifications = change_util.compressChanges( locallyQueuedChanges, original );
+	const patchWithLocalChanges = change_util.transform( localModifications, incomingPatch, original );
+
+	const updatedData = patchWithLocalChanges
+		? change_util.apply( patchWithLocalChanges, entityData )
+		: entityData;
+
+	// TODO: Will this ever be false at this point?
+	if (patchWithLocalChanges) {
+		// re-queue our local changes which have now been rebased against the remote update
+		this.localQueue.queue( change_util.modify( entityId, version, patchWithLocalChanges ) );
+	}
+
+	return this
+		.store
+		.put( entityId, version, entityData )
+		.then( this.emit.bind( this, 'update', entityId, updatedData, original, incomingPatch, this.isIndexing ) );
 };
 
 internal.removeObject = function( id, acknowledged ) {
