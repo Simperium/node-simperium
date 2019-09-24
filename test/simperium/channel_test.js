@@ -423,7 +423,7 @@ describe( 'Channel', function() {
 
 			channel.once( 'send', () => {
 				// we should sent out our change the first time
-				channel.on( 'error', done );
+				bucket.once( 'error', done );
 				channel.localQueue.once( 'queued', () => done( 'Should not queue duplicate changes' ) );
 				channel.once( 'acknowledge', () => done() );
 
