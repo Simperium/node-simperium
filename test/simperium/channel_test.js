@@ -416,6 +416,37 @@ describe( 'Channel', function() {
 			channel.handleMessage( 'c:' + JSON.stringify( [{error: 405, id: 'thing', ccids: ['abc']}] ) );
 		} );
 
+		it( 'should stop sending duplicate changes after receiving a 409', done => {
+			const change = {o: 'M', id: 'thing', sv: 1, ccid: 'duplicate', v: diff( {}, {key: 'value'} )};
+
+			channel.localQueue.queue( change );
+
+			channel.once( 'send', () => {
+				// we should sent out our change the first time
+				bucket.once( 'error', done );
+				channel.localQueue.once( 'queued', () => done( 'Should not queue duplicate changes' ) );
+				channel.once( 'acknowledge', () => done() );
+
+				channel.handleMessage( 'c:' + JSON.stringify( [{
+					id: 'thing',
+					error: 409,
+					ccids: ['duplicate']
+				}] ) );
+			} );
+		} );
+
+		it( 'should acknowledge sent changes when receiving 409', ( done ) =>{
+			channel.localQueue.sent['mock-id'] = { fake: 'change', ccid: 'dup-ccid', id: 'mock-id' };
+
+			bucket.once( 'error', done );
+
+			// when we get the 409 we should acknowledge the change and clear the sent queue
+			channel.once( 'sent', () => done( 'Should not send a duplicate change' ) );
+			channel.once( 'acknowledge', () => done() );
+
+			channel.handleMessage( 'c:[{"error": 409, "ccids":["dup-ccid"], "id": "mock-id"}]' );
+		} );
+
 		describe( 'with synced object', () => {
 			beforeEach( ( done ) => {
 				var data = { title: 'hola mundo' };
@@ -436,37 +467,6 @@ describe( 'Channel', function() {
 					equal( version, 1 );
 					done()
 				} );
-			} );
-
-			it( 'should handle a 409', ( done ) =>{
-				const expectedChange = { fake: 'change', ccid: 'dup-ccid', id: 'mock-id' };
-				channel.localQueue.sent['mock-id'] = { fake: 'change', ccid: 'dup-ccid', id: 'mock-id' };
-
-				/**
-				 * If the 409 is not handled the bucket will error
-				 */
-				bucket.once( 'error', ( e ) => {
-					done( e );
-				} );
-
-				/**
-				 * After successfully handling the 409 we should have an acknowledged
-				 * local change matching the duplicated ccid error.
-				 */
-				channel.once( 'acknowledge', ( id, change ) => {
-					try {
-						equal( id, 'mock-id' );
-						deepEqual( expectedChange, change )
-						done();
-					} catch ( error ) {
-						done( error );
-					}
-				} );
-
-				/**
-				 * Simulate receiving a 409
-				 */
-				channel.handleMessage( 'c:[{"error": 409, "ccids":["dup-ccid"], "id": "mock-id"}]' );
 			} );
 		} );
 	} );
