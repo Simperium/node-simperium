@@ -21,8 +21,8 @@
   "author": "",
   "license": "BSD-2-Clause",
   "dependencies": {
-    "uuid": "3.3.2",
-    "websocket": "1.0.29"
+    "uuid": "3.3.3",
+    "websocket": "1.0.30"
   },
   "devDependencies": {
     "@babel/cli": "7.5.5",
