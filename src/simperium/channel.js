@@ -125,16 +125,16 @@ internal.updateObjectVersion = function( entityId, version, entityData, original
 	 *  - Re-submit them to the outbound queue
 	 */
 
-	const locallyQueuedChanges = this.localQueue.dequeueChangesFor( entityId );
-	const localModifications = change_util.compressChanges( locallyQueuedChanges, original );
-	const patchWithLocalChanges = change_util.transform( localModifications, incomingPatch, original );
-	const updatedData = change_util.apply( patchWithLocalChanges, entityData );
+	const queuedLocalChangeList = this.localQueue.dequeueChangesFor( entityId );
+	const compressedLocalChange = change_util.compressChanges( queuedLocalChangeList, original );
+	const patchWithLocalChanges = change_util.transform( compressedLocalChange, incomingPatch, original );
+	const transformedEntityData = change_util.apply( patchWithLocalChanges, entityData );
 	this.localQueue.queue( change_util.modify( entityId, version, patchWithLocalChanges ) );
 
 	return this
 		.store
 		.put( entityId, version, entityData )
-		.then( this.emit.bind( this, 'update', entityId, updatedData, original, incomingPatch, this.isIndexing ) );
+		.then( this.emit.bind( this, 'update', entityId, transformedEntityData, original, incomingPatch, this.isIndexing ) );
 };
 
 internal.removeObject = function( id, acknowledged ) {
