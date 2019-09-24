@@ -114,23 +114,22 @@ internal.updateObjectVersion = function( entityId, version, entityData, original
 			.then( internal.updateAcknowledged.bind( this, localChange ) );
 	}
 
-	// If we don't have a record of the change already it means that
-	// it originated in another remote client
-	// we need to provide a way for the current client to respond to
-	// a potential conflict if it has modifications that have not been synced
+	/*
+	 * If we don't have a record of the change already it means that
+	 * it originated in another remote client. We need to provide a
+	 * way for the current client to respond to a potential conflict
+	 * if it has modifications that have not been synced
+	 *
+	 *  - Start by removing the existing queued local changes
+	 *  - Modify them
+	 *  - Re-submit them to the outbound queue
+	 */
+
 	const locallyQueuedChanges = this.localQueue.dequeueChangesFor( entityId );
 	const localModifications = change_util.compressChanges( locallyQueuedChanges, original );
 	const patchWithLocalChanges = change_util.transform( localModifications, incomingPatch, original );
-
-	const updatedData = patchWithLocalChanges
-		? change_util.apply( patchWithLocalChanges, entityData )
-		: entityData;
-
-	// TODO: Will this ever be false at this point?
-	if (patchWithLocalChanges) {
-		// re-queue our local changes which have now been rebased against the remote update
-		this.localQueue.queue( change_util.modify( entityId, version, patchWithLocalChanges ) );
-	}
+	const updatedData = change_util.apply( patchWithLocalChanges, entityData );
+	this.localQueue.queue( change_util.modify( entityId, version, patchWithLocalChanges ) );
 
 	return this
 		.store
