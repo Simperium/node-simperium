@@ -95,6 +95,56 @@ describe( 'Channel', function() {
 			channel.localQueue.start();
 		} );
 
+		it( 'should break', ( done ) => {
+			channel.store.put( 'thing', 1, {content: 'AC'} ).then( () => {
+
+				channel.localQueue.sent.thing = {
+					id: 'thing',
+					sv: 1,
+					o: 'M',
+					v: {
+						content: {
+							o: 'd',
+							v: '=2\t+D'
+						}
+					},
+					ccid: 'local-offline'
+				}
+
+				channel.handleMessage( 'c:' + JSON.stringify( [{
+					id: 'thing',
+					sv: 1,
+					ev: 2,
+					o: 'M',
+					v: {
+						content: {
+							o: 'd',
+							v: '=1\t+B\t=1'
+						}
+					},
+					ccids: ['remote']
+				}] ) )
+
+				channel.on( 'send', done );
+
+				channel.handleMessage( 'c:' + JSON.stringify( [{
+					id: 'thing',
+					sv: 2,
+					ev: 3,
+					o: 'M',
+					v: {
+						content: {
+							o: 'd',
+							v: '=3\t+D'
+						}
+					},
+					ccids: ['local-offline']
+				}] ) )
+
+				channel.once( 'acknowledge', () => done() );
+			} )
+		} );
+
 		it( 'should send change to create object', function( done ) {
 			channel.on( 'send', function( data ) {
 				var marker = data.indexOf( ':' ),

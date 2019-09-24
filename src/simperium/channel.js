@@ -116,19 +116,21 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 	// we need to provide a way for the current client to respond to
 	// a potential conflict if it has modifications that have not been synced
 	if ( !acknowledged ) {
-		changes = this.localQueue.dequeueChangesFor( id );
-		localModifications = change_util.compressChanges( changes, original );
-		remoteModifications = patch;
-		transformed = change_util.transform( localModifications, remoteModifications, original );
-		update = data;
+		if ( ! this.localQueue.sent[id] ) {
+			changes = this.localQueue.dequeueChangesFor( id );
+			localModifications = change_util.compressChanges( changes, original );
+			remoteModifications = patch;
+			transformed = change_util.transform( localModifications, remoteModifications, original );
+			update = data;
 
-		// apply the transformed patch and emit the update
-		if ( transformed ) {
-			patch = transformed;
-			update = change_util.apply( transformed, data );
-			// queue up the new change
-			change = change_util.modify( id, version, patch );
-			this.localQueue.queue( change );
+			// apply the transformed patch and emit the update
+			if (transformed) {
+				patch = transformed;
+				update = change_util.apply( transformed, data );
+				// queue up the new change
+				change = change_util.modify( id, version, patch );
+				this.localQueue.queue( change );
+			}
 		}
 
 		notify = this.emit.bind( this, 'update', id, update, original, patch, this.isIndexing );
