@@ -1,19 +1,17 @@
 language: node_js
 sudo: false
 script:
-# lint errors fail the build
-- npm run lint
-# unit tests with coverage report
-- npm run test:coverage
+  # lint errors fail the build
+  - npm run lint
+  # unit tests with coverage report
+  - npm run test:coverage
 node_js:
-- '10'
-- '9'
-- '8'
-- '7'
-- '6'
+  - "10"
+  - "9"
+  - "8"
 cache:
   directories:
-  - node_modules
+    - node_modules
 deploy:
   # keeps necessary babel dependency for npm prepare
   skip_cleanup: true
@@ -27,4 +25,4 @@ deploy:
     # builds all tagged commits using node@8.0 environment
     tags: true
     repo: Simperium/node-simperium
-    node: '8'
+    node: "8"
