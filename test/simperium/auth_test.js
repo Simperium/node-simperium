@@ -3,6 +3,7 @@ import https from 'https'
 import { equal, deepEqual } from 'assert'
 import { EventEmitter } from 'events'
 
+const originalRequest = https.request;
 const stub = ( respond ) => {
 	https.request = ( options, handler ) => {
 		const req = new EventEmitter()
@@ -20,6 +21,11 @@ const stubResponse = ( data ) => stub( ( body, handler ) => {
 
 describe( 'Auth', () => {
 	let auth;
+
+	after( () => {
+		// Unstub it
+		https.request = originalRequest;
+	} );
 
 	beforeEach( () => {
 		auth = buildAuth( 'token', 'secret' );
