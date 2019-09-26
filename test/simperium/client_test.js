@@ -1,6 +1,6 @@
 import { Client } from '../../src/simperium/client';
 import * as events from 'events';
-import { equal, deepEqual, ok } from 'assert';
+import { equal, ok } from 'assert';
 
 class MockWebSocket extends events.EventEmitter {
 	constructor( ...args ) {
