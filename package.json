@@ -13,7 +13,7 @@
   "scripts": {
     "flow": "flow",
     "test:coverage": "nyc npm test",
-    "test": "mocha --reporter dot --require @babel/register --require babel-polyfill test/**",
+    "test": "mocha --reporter dot --require @babel/register --require @babel/polyfill test/**",
     "babel": "babel -q -d lib/ src/",
     "lint": "eslint --quiet src/",
     "prepare": "npm run babel"
@@ -21,7 +21,7 @@
   "author": "",
   "license": "BSD-2-Clause",
   "dependencies": {
-    "babel-polyfill": "^6.26.0",
+    "@babel/polyfill": "^7.6.0",
     "uuid": "3.3.3",
     "websocket": "1.0.30"
   },
