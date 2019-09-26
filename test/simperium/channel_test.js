@@ -375,7 +375,7 @@ describe( 'Channel', function() {
 		 * while the application does not have a network connection.
 		 *
 		 * If the same object is modified elsewhere, the application will receive a network change
-		 * and update it's ghost for the object. However, becaus the Channel's localQueue of changes
+		 * and update its ghost for the object. However, because the Channel's localQueue of changes
 		 * is in-memory only, the library will not merge the changes from when the bucket object
 		 * was updated while offline.
 		 *

@@ -235,7 +235,7 @@ Bucket.prototype.setChannel = function( channel ) {
 };
 
 /**
- * @callback NetworkChangeSubscribe
+ * @callback NetworkChangeSubscriber
  * @param { string } key - bucket object being changed
  * @param { Object } data - the new object data
  * @param { Object } base - the object data before the patch is applied
