@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+mkdir -p tmp
+
+# Build latest simplenote
+if [[ ! -d "tmp/simplenote-electron" ]]; then
+  git clone https://github.com/automattic/simplenote-electron.git tmp/simplenote-electron --branch develop  
+  cd tmp/simplenote-electron
+  npm install
+fi
+npm link ../../
+NODE_ENV=development npx webpack-dev-server --config ./webpack.config.js --content-base dist --port 4000 --open
