@@ -5,16 +5,7 @@ import Channel from './channel'
 import defaultGhostStoreProvider from './ghost/default'
 import defaultObjectStoreProvider from './storage/default'
 
-var WebSocketClient;
-if ( typeof window !== 'undefined' && window.WebSocket ) {
-	WebSocketClient = window.WebSocket;
-} else {
-	WebSocketClient = require( 'websocket' ).w3cwebsocket;
-}
-
-module.exports = Client;
-module.exports.Bucket = Bucket;
-module.exports.Channel = Channel;
+export { Bucket, Channel };
 
 /**
  * @function
@@ -31,6 +22,12 @@ module.exports.Channel = Channel;
  */
 
 /**
+ * @function
+ * @name websocketClientProvider
+ * @param {String} - The url to open the socket connection with
+ * @returns {Object} a WebSocket client
+
+/**
  * A Client is the main interface to Simperium.
  *
  * @param {String} appId - Simperium application id
@@ -40,14 +37,16 @@ module.exports.Channel = Channel;
  *            - factory function for creating ghost store instances
  * @param {bucketStoreProvider} [options.objectStoreProvider=defaultObjectStoreProvider]
  *            - factory function for creating object store instances
- * @param {number} [heartbeatInterval=4] - heartbeat interval for maintaining connection status with Simperium.com
+ * @param {number} [options.heartbeatInterval=4] - heartbeat interval for maintaining connection status with Simperium.com
+ * @param {websocketClientProvider} [options.websocketClientProvider] - WebSocket transport, if not provided tries to use window.WebSocket
  */
-function Client( appId, accessToken, options ) {
+export function Client( appId, accessToken, options ) {
 	options = options || {};
 
 	options.ghostStoreProvider = options.ghostStoreProvider || defaultGhostStoreProvider;
 	options.objectStoreProvider = options.objectStoreProvider || defaultObjectStoreProvider;
 	options.hearbeatInterval = options.heartbeatInterval || 4;
+	options.websocketClientProvider = options.websocketClientProvider || defaultWebsocketClientProvider;
 
 	this.accessToken = accessToken;
 	this.open = false;
@@ -116,10 +115,9 @@ Client.prototype.onHeartbeat = function( message ) {
 Client.prototype.onConnect = function() {
 	this.open = true;
 
-	this.emit( 'connect' );
-
 	this.heartbeat.start();
 	this.reconnectionTimer.reset();
+	this.emit( 'connect' );
 };
 
 Client.prototype.onReconnect = function( attempt ) {
@@ -172,6 +170,7 @@ Client.prototype.send = function( data ) {
 		this.socket.send( data );
 	} catch ( e ) {
 		// failed to send, probably not connected
+		this.emit( 'error', e );
 	}
 };
 
@@ -181,7 +180,7 @@ Client.prototype.sendChannelMessage = function( id, message ) {
 
 Client.prototype.connect = function() {
 	this.reconnect = true;
-	this.socket = new WebSocketClient( this.options.url );
+	this.socket = this.options.websocketClientProvider( this.options.url );
 
 	this.socket.onopen = this.onConnect.bind( this );
 	this.socket.onmessage = this.onMessage.bind( this );
@@ -199,6 +198,7 @@ Client.prototype.disconnect = function() {
 Client.prototype.end = function() {
 	this.reconnect = false;
 	this.reconnectionTimer.stop();
+	this.heartbeat.stop();
 	this.disconnect();
 };
 
@@ -215,7 +215,7 @@ Client.prototype.setAccessToken = function( token ) {
 	this.connect();
 };
 
-function Heartbeat( seconds, onBeat ) {
+export function Heartbeat( seconds, onBeat ) {
 	this.count = 0;
 	this.seconds = seconds;
 	EventEmitter.call( this );
@@ -246,6 +246,7 @@ Heartbeat.prototype.tick = function( count ) {
 
 Heartbeat.prototype.start = function() {
 	this.stop();
+	clearTimeout( this.timer );
 	this.timer = setTimeout( this.onBeat.bind( this ), this.seconds * 1000 );
 };
 
@@ -254,7 +255,7 @@ Heartbeat.prototype.stop = function() {
 	clearTimeout( this.timeout );
 };
 
-function ReconnectionTimer( interval, onTripped ) {
+export function ReconnectionTimer( interval, onTripped ) {
 	EventEmitter.call( this );
 
 	this.started = false;
@@ -290,3 +291,13 @@ ReconnectionTimer.prototype.reset = ReconnectionTimer.prototype.stop = function(
 	this.started = false;
 	clearTimeout( this.timer );
 };
+
+function defaultWebsocketClientProvider( url ) {
+	let WebSocketClient;
+	if ( typeof window !== 'undefined' && window.WebSocket ) {
+		WebSocketClient = window.WebSocket;
+	} else {
+		WebSocketClient = require( 'websocket' ).w3cwebsocket;
+	}
+	return new WebSocketClient( url );
+}
