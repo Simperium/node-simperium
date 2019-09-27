@@ -419,6 +419,53 @@ describe( 'Channel', function() {
 			bucket.update( key, {title: 'Goodbye world'} );
 		} ) );
 
+		it( 'should not rebase local changes waiting for confirmation from the server', async () => {
+			await channel.store.put( 'thing', 1, { content: 'AC' } );
+
+			channel.localQueue.queue( {
+				id: 'thing',
+				o: 'M',
+				sv: 1,
+				ev: 2,
+				ccid: 'local',
+				v: diff( { content: 'AC' }, { content: 'ACD' } )
+			} );
+
+			await new Promise( resolve => channel.once( 'send', resolve ) );
+			channel.once( 'send', () => done( 'Should not re-send changes which are already outbound' ) );
+
+			const ghost = await channel.store.get( 'thing' );
+			deepEqual( ghost.data, { content: 'AC' } );
+
+			channel.handleMessage( 'c:' + JSON.stringify( [ {
+				id: 'thing',
+				o: 'M',
+				sv: 1,
+				ev: 2,
+				ccids: [ 'remote' ],
+				v: diff( { content: 'AC' }, { content: 'ABC' } )
+			} ] ) );
+
+			await channel.store.get( 'thing' );
+
+			return new Promise( resolve => {
+				channel.once( 'acknowledge', async () => {
+					const ghost = await channel.store.get( 'thing' );
+					deepEqual( ghost.data, { content: 'ABCD' } );
+					resolve();
+				} );
+
+				channel.handleMessage( 'c:' + JSON.stringify( [ {
+					id: 'thing',
+					o: 'M',
+					sv: 2,
+					ev: 3,
+					ccids: [ 'local' ],
+					v: diff( { content: 'ABC' }, { content: 'ABCD' } )
+				} ] ) )
+			} );
+		} );
+
 		it( 'should emit errors on the bucket instance', ( done ) => {
 			const error = {error: 404, id: 'thing', ccids: ['abc']}
 			bucket.on( 'error', ( e ) => {

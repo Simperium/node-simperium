@@ -116,11 +116,12 @@ internal.removeAndSend = function( id ) {
 internal.updateObjectVersion = function( id, version, data, original, patch, acknowledged ) {
 	const save = () => this.store.put( id, version, data );
 
-	if ( acknowledged ) {
+	if ( acknowledged || this.localQueue.sent[id] ) {
 		return save().then( () => {
 			internal.updateAcknowledged.call( this, acknowledged );
 		} );
 	}
+
 	// If it's not an ack, it's a change initiated on a different client
 	// we need to provide a way for the current client to respond to
 	// a potential conflict if it has modifications that have not been synced
