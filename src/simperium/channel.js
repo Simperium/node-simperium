@@ -807,7 +807,7 @@ LocalQueue.prototype.dequeueChangesFor = function( id ) {
 	var changes = [], sent = this.sent[id], queue = this.queues[id];
 
 	if ( sent ) {
-		delete this.sent[id];
+		this.sent[id];
 		changes.push( sent );
 	}
 

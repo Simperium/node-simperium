@@ -1,6 +1,7 @@
-import Client from './client'
-import Auth from './auth'
-import * as util from './util'
+import Client from './client';
+import Bucket from './bucket';
+import Auth from './auth';
+import * as util from './util';
 
 /**
  * A Client is the main interface to Simperium.
@@ -23,4 +24,4 @@ export default function createClient( appId, token, options ) {
 	return new Client( appId, token, options ).on( 'error', () => {} );
 }
 
-export { Auth, Client, util }
+export { Auth, Client, Bucket, util };
