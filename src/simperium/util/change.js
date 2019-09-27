@@ -20,27 +20,36 @@ type ChangeID = string
  * A more descriptive type for the modifications present in a
  * bucket change operation.
  */
-type BucketObjectModification = ObjectOperationSet
+export type BucketObjectModification = ObjectOperationSet
+
+type DataValue = boolean | string | number | null | {[string]: DataValue}
+export type Data = {[string]: DataValue};
 
 /**
  * An operation that modifies an object within a bucket.
  */
-type BucketModifyOperation = {
+export type BucketModifyOperation = {|
 	o: 'M',
 	id: BucketObjectID,
 	ccid: ChangeID,
 	v: BucketObjectModification,
-	sv?: number
-}
+	sv?: number,
+	d?: Data,
+|}
 
 /**
  * An operation that deletes an object from a bucket.
  */
-type BucketRemoveOperation = {
+export type BucketRemoveOperation = {|
 	o: '-',
 	id: BucketObjectID,
 	ccid: ChangeID
-}
+|}
+
+export type Ghost = {|
+	version: number,
+	data: Data,
+|}
 
 /**
  * Union type of the two possible operations that can modify data inside
@@ -85,7 +94,7 @@ function modify( id: BucketObjectID, version: number, patch: BucketObjectModific
  * @param { {version: number, data: {}} } ghost - the version and properties that are present on simperium
  * @returns { object } the bucket operation that produces the modifications to the object on simperium
  */
-function buildChange( type: BucketChangeType, id: string, object: {}, ghost: { version: number, data: {} } ) {
+function buildChange( type: BucketChangeType, id: string, object: {}, ghost: Ghost ): BucketOperation {
 	// Remove operations have no source version or diff
 	if ( type === '-' ) return {
 		o: '-',
@@ -113,7 +122,6 @@ function buildChange( type: BucketChangeType, id: string, object: {}, ghost: { v
  * @returns { ?object } the combined changes. If any changes delete the object the result is null
  */
 function compressChanges( changes: BucketOperation[], origin: {} ): ?BucketObjectModification {
-
 	if ( changes.length === 0 ) {
 		return {};
 	}
@@ -160,4 +168,15 @@ function rebase( modifications: BucketObjectModification, upstream: BucketObject
  */
 function apply_diff( modifications: BucketObjectModification, base: {} ) {
 	return apply_object_diff( base, modifications );
+}
+
+export function isEmptyChange( change: BucketOperation ) {
+	switch ( change.o ) {
+		case 'M': {
+			return Object.keys( change.v ).length === 0;
+		}
+		default: {
+			false;
+		}
+	}
 }

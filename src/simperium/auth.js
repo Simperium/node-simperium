@@ -10,7 +10,7 @@ type User = {
 };
 
 const fromJSON = ( json: string ): User => {
-	const data: {} = JSON.parse( json );
+	const data = JSON.parse( json );
 	if ( ! data.access_token && typeof data.access_token !== 'string' ) {
 		throw new Error( 'access_token not present' );
 	}
@@ -74,9 +74,10 @@ export class Auth extends EventEmitter {
 	}
 
 	getUrlOptions( path: string ) {
-		const options = url.parse( `${URL}/${ this.appId }/${ path}` );
+		const { port, ...options } = url.parse( `${URL}/${ this.appId }/${ path}` );
 		return {
 			... options,
+			port: port ? Number( port ) : undefined,
 			method: 'POST',
 			headers: {'X-Simperium-API-Key': this.appSecret }
 		};

@@ -3,6 +3,7 @@ import { format, inherits } from 'util'
 import { EventEmitter } from 'events'
 import { parseMessage, parseVersionMessage, change as change_util } from './util'
 import { v4 as uuid } from 'uuid'
+import buildOperation from './util/operation';
 
 const UNKNOWN_CV = '?';
 const CODE_INVALID_VERSION = 405;
@@ -69,13 +70,13 @@ internal.buildModifyChange = function( id, object, ghost ) {
 		}
 	}
 
+	// if the change v is an empty object, do not send, notify?
 	if ( empty ) {
 		this.emit( 'unmodified', id, object, ghost );
 		return;
 	}
 
-	// if the change v is an empty object, do not send, notify?
-	this.localQueue.queue( payload );
+	this.localQueue.queue( { type: 'modify', id, object } );
 };
 
 /**
@@ -86,9 +87,8 @@ internal.buildModifyChange = function( id, object, ghost ) {
  * @param {String} id - object to remove
  * @param {Object} ghost - current ghost object for the given id
  */
-internal.buildRemoveChange = function( id, ghost ) {
-	var payload = change_util.buildChange( change_util.type.REMOVE, id, {}, ghost );
-	this.localQueue.queue( payload );
+internal.buildRemoveChange = function( id ) {
+	this.localQueue.queue( { type: 'remove', id } );
 };
 
 internal.diffAndSend = function( id, object ) {
@@ -121,6 +121,7 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 			internal.updateAcknowledged.call( this, acknowledged );
 		} );
 	}
+
 	// If it's not an ack, it's a change initiated on a different client
 	// we need to provide a way for the current client to respond to
 	// a potential conflict if it has modifications that have not been synced
@@ -139,12 +140,9 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 			// if the rebase operation results in a modified object
 			// generate a new patch and queue it to be sent to simperium
 			if ( transformed ) {
-				const patch = transformed,
-					change = change_util.modify( id, version, patch );
-
 				update = change_util.apply( transformed, data );
 				// queue up the new change
-				this.localQueue.queue( change );
+				this.localQueue.queue( { type: 'modify', id, object: update } );
 			}
 
 			return save().then( () => {
@@ -241,11 +239,9 @@ internal.handleChangeError = function( err, change, acknowledged ) {
 	switch ( err.code ) {
 		case CODE_INVALID_VERSION:
 		case CODE_INVALID_DIFF: // Invalid version or diff, send full object back to server
-			if ( ! change.hasSentFullObject ) {
+			if ( ! acknowledged || ! acknowledged.d ) {
 				this.store.get( change.id ).then( object => {
-					change.d = object;
-					change.hasSentFullObject = true;
-					this.localQueue.queue( change );
+					this.localQueue.queue( { type: 'full', originalChange: acknowledged, object } );
 				} );
 			} else {
 				this.localQueue.dequeueChangesFor( change.id );
@@ -837,16 +833,12 @@ LocalQueue.prototype.processQueue = function( id ) {
 		this.emit( 'wait', id );
 		return;
 	}
-
 	this.store.get( id ).then( compressAndSend );
 }
 
 LocalQueue.prototype.compressAndSend = function( id, ghost ) {
 	var changes = this.queues[id];
 	var change;
-	var target = ghost.data;
-	var c;
-	var type;
 
 	// a change was sent before we could compress and send
 	if ( this.sent[id] ) {
@@ -854,35 +846,20 @@ LocalQueue.prototype.compressAndSend = function( id, ghost ) {
 		return;
 	}
 
-	if ( changes.length === 1 ) {
-		change = changes.shift();
-		this.sent[id] = change;
-		this.emit( 'send', change );
+	const sending = changes.reduce( ( chosen, next ) => {
+		if ( chosen.type === 'remove' ) {
+			return chosen;
+		}
+		return next;
+	} );
+
+	change = buildOperation( sending, ghost );
+	this.queues[id] = [];
+	this.sent[id] = change;
+	if ( change_util.isEmptyChange( change ) ) {
 		return;
 	}
 
-	if ( changes.length > 1 && changes[0].type === change_util.type.REMOVE ) {
-		change = changes.shift();
-		changes.splice( 0, changes.length - 1 );
-		this.sent[id] = change;
-		this.emit( 'send', change );
-	}
-
-	while ( changes.length > 0 ) {
-		c = changes.shift();
-
-		if ( c.o === change_util.type.REMOVE ) {
-			changes.unshift( c );
-			break;
-		}
-
-		target = change_util.apply( c.v, target );
-	}
-
-	type = target === null ? change_util.type.REMOVE : change_util.type.MODIFY;
-	change = change_util.buildChange( type, id, target, ghost );
-
-	this.sent[id] = change;
 	this.emit( 'send', change );
 }
 

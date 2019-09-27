@@ -108,7 +108,7 @@ describe( 'Channel', function() {
 				done();
 			} );
 
-			bucket.update( '12345', {content: 'Hola mundo!'});
+			bucket.update( '12345', {content: 'Hola mundo!'} );
 		} );
 
 		it( 'should not send a change with an empty diff', function( done ) {
@@ -219,7 +219,7 @@ describe( 'Channel', function() {
 			var validate = fn.counts( 1, function() {
 				var queue = channel.localQueue.queues['123'];
 				equal( queue.length, 2 );
-				equal( queue.slice( -1 )[0].o, '-' );
+				deepEqual( queue.slice( -1 )[0], { type: 'remove', id: '123' } );
 				done();
 			} );
 
@@ -337,9 +337,10 @@ describe( 'Channel', function() {
 			store.index[key] = JSON.stringify( { version: 1, data: current } );
 
 			// the first send is the attempt to change Hello world to Goodbye world
-			channel.once( 'send', ( data ) => {
+			channel.once( 'send', () => {
 				// a network change has been received, now we're going to send
-				// the rebased diff
+				// the rebased diff, wrong, we're going to wait until ours comes back
+				// because we already sent it.
 				channel.once( 'send', () => {
 					bucket.get( key ).then( ( bucketObject ) => {
 						try {
@@ -366,7 +367,6 @@ describe( 'Channel', function() {
 
 			// We're changing "Hello world" to "Goodbye world"
 			bucket.update( key, {title: 'Goodbye world'} );
-
 		} ) );
 
 		/**
@@ -432,7 +432,6 @@ describe( 'Channel', function() {
 		it( 'should ignore 412 change errors', function( done ) {
 			// if a change is sent and acknowledged with a 412, change should be dequeued and
 			// no error should be emitted
-			var change = {o: 'M', id: 'thing', ev: 2, ccid: 'abc', v: diff( {}, {hello: 'world'} ) };
 
 			// channel should not emit error during this change
 			channel.on( 'error', function( e ) {
@@ -448,29 +447,29 @@ describe( 'Channel', function() {
 				} );
 
 				// listen for change to be sent
-				channel.localQueue.once( 'send', function() {
+				channel.localQueue.once( 'send', function( change ) {
 					ok( channel.localQueue.sent.thing );
 					// send a 412 response
-					channel.handleMessage( 'c:' + JSON.stringify( [{error: 412, id: 'thing', ccids: ['abc']}] ) );
+					channel.handleMessage( 'c:' + JSON.stringify( [{error: 412, id: 'thing', ccids: [ change.ccid ]}] ) );
 				} );
 				// queue up the change
-				channel.localQueue.queue( change );
+				channel.localQueue.queue( { type: 'modify', id: 'thing', object: { hello: 'world' } }, { version: 1, data: {} } );
 			} );
 		} );
 
 		it( 'should send full object on 405 error', function( done ) {
 			// if a change is sent and a 405 is returned, the full object should be sent
 			// Add an object to the store
-			channel.store.put( 'thing', 1, {} );
+			channel.store.put( 'thing', 1, { key: 'value' } );
 
 			// channel should not emit error during this change
 			channel.on( 'error', function( e ) {
 				done( e );
 			} );
 
-			// ensure that a change with a `d` property is added to the queue
+			// ensure that a change to send the full object is added to the queue
 			channel.localQueue.once( 'queued', function( id, change, queue ) {
-				ok( queue[0].d );
+				equal( queue[0].type, 'full' );
 				done();
 			} );
 
@@ -479,11 +478,15 @@ describe( 'Channel', function() {
 		} );
 
 		it( 'should stop sending duplicate changes after receiving a 409', done => {
-			const change = {o: 'M', id: 'thing', sv: 1, ccid: 'duplicate', v: diff( {}, {key: 'value'} )};
+			const change = {
+				type: 'modify',
+				id: 'thing',
+				object: { key: 'value' },
+			}
 
 			channel.localQueue.queue( change );
 
-			channel.once( 'send', () => {
+			channel.once( 'send', ( outbound ) => {
 				// we should sent out our change the first time
 				bucket.once( 'error', done );
 				channel.localQueue.once( 'queued', () => done( 'Should not queue duplicate changes' ) );
@@ -492,7 +495,7 @@ describe( 'Channel', function() {
 				channel.handleMessage( 'c:' + JSON.stringify( [{
 					id: 'thing',
 					error: 409,
-					ccids: ['duplicate']
+					ccids: [JSON.parse( parseMessage( outbound ).data ).ccid]
 				}] ) );
 			} );
 		} );
