@@ -116,7 +116,7 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 	// If it's not an ack, it's a change initiated on a different client
 	// we need to provide a way for the current client to respond to
 	// a potential conflict if it has modifications that have not been synced
-	if ( !acknowledged ) {
+	if ( !acknowledged && !this.localQueue.sent[id] ) {
 		changes = this.localQueue.dequeueChangesFor( id );
 		localModifications = change_util.compressChanges( changes, original );
 		remoteModifications = patch;
