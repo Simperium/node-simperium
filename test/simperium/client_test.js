@@ -1,4 +1,4 @@
-import { Client } from '../../src/simperium/client';
+import Client from '../../src/simperium/client';
 import * as events from 'events';
 import { equal, ok } from 'assert';
 
