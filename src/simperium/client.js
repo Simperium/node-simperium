@@ -301,3 +301,6 @@ function defaultWebsocketClientProvider( url ) {
 	}
 	return new WebSocketClient( url );
 }
+
+// Simplenote expects this.
+Client.Bucket = Bucket;
