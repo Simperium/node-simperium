@@ -40,7 +40,7 @@ export { Bucket, Channel };
  * @param {number} [options.heartbeatInterval=4] - heartbeat interval for maintaining connection status with Simperium.com
  * @param {websocketClientProvider} [options.websocketClientProvider] - WebSocket transport, if not provided tries to use window.WebSocket
  */
-export function Client( appId, accessToken, options ) {
+export default function Client( appId, accessToken, options ) {
 	options = options || {};
 
 	options.ghostStoreProvider = options.ghostStoreProvider || defaultGhostStoreProvider;
