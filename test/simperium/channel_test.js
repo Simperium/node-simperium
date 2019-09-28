@@ -336,37 +336,35 @@ describe( 'Channel', function() {
 
 			store.index[key] = JSON.stringify( { version: 1, data: current } );
 
-			// the first send is the attempt to change Hello world to Goodbye world
-			channel.once( 'send', ( data ) => {
-				// a network change has been received, now we're going to send
-				// the rebased diff
-				channel.once( 'send', () => {
-					bucket.get( key ).then( ( bucketObject ) => {
-						try {
-							// bucket object is the result of rebasing local modifications
-							// on top of the network changes
-							deepEqual( bucketObject.data, { title: 'Goodbye kansas' } );
-							// the channel will send the diff that results from the rebased
-							// object and the latest ghost
-							deepEqual(
-								channel.localQueue.sent[key].v,
-								diff( { title: 'Hello kansas' }, { title: 'Goodbye kansas' } )
-							);
-						} catch ( error ) {
-							reject( error );
-						}
-						resolve();
-					} )
+			// a network change has been received, now we're going to send
+			// the rebased diff
+			channel.once( 'send', () => {
+				bucket.get( key ).then( ( bucketObject ) => {
+					try {
+						// bucket object is the result of rebasing local modifications
+						// on top of the network changes
+						deepEqual( bucketObject.data, { title: 'Goodbye kansas' } );
+						// the channel will send the diff that results from the rebased
+						// object and the latest ghost
+						deepEqual(
+							channel.localQueue.sent[key].v,
+							diff( { title: 'Hello kansas' }, { title: 'Goodbye kansas' } )
+						);
+					} catch ( error ) {
+						reject( error );
+					}
+					resolve();
 				} )
-				// We receive a remote change from "Hello world" to "Hello kansas"
-				channel.handleMessage( 'c:' + JSON.stringify( [{
-					o: 'M', ev: 2, sv: 1, cv: 'cv1', id: key, v: remoteDiff
-				}] ) );
-			} );
+			} )
 
-			// We're changing "Hello world" to "Goodbye world"
-			bucket.update( key, {title: 'Goodbye world'} );
+			// We're changing "Hello world" to "Goodbye world", not syncing yet though
+			// so there is no sent change when the next inbound change comes
+			bucket.update( key, {title: 'Goodbye world'}, {}, { sync: false } );
 
+			// We receive a remote change from "Hello world" to "Hello kansas"
+			channel.handleMessage( 'c:' + JSON.stringify( [{
+				o: 'M', ev: 2, sv: 1, cv: 'cv1', id: key, v: remoteDiff
+			}] ) );
 		} ) );
 
 		/**
