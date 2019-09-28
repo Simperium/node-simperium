@@ -336,37 +336,35 @@ describe( 'Channel', function() {
 
 			store.index[key] = JSON.stringify( { version: 1, data: current } );
 
-			// the first send is the attempt to change Hello world to Goodbye world
+			// a network change has been received, now we're going to send
+			// the rebased diff
 			channel.once( 'send', () => {
-				// a network change has been received, now we're going to send
-				// the rebased diff, wrong, we're going to wait until ours comes back
-				// because we already sent it.
-				channel.once( 'send', () => {
-					bucket.get( key ).then( ( bucketObject ) => {
-						try {
-							// bucket object is the result of rebasing local modifications
-							// on top of the network changes
-							deepEqual( bucketObject.data, { title: 'Goodbye kansas' } );
-							// the channel will send the diff that results from the rebased
-							// object and the latest ghost
-							deepEqual(
-								channel.localQueue.sent[key].v,
-								diff( { title: 'Hello kansas' }, { title: 'Goodbye kansas' } )
-							);
-						} catch ( error ) {
-							reject( error );
-						}
-						resolve();
-					} )
+				bucket.get( key ).then( ( bucketObject ) => {
+					try {
+						// bucket object is the result of rebasing local modifications
+						// on top of the network changes
+						deepEqual( bucketObject.data, { title: 'Goodbye kansas' } );
+						// the channel will send the diff that results from the rebased
+						// object and the latest ghost
+						deepEqual(
+							diff( { title: 'Hello kansas' }, { title: 'Goodbye kansas' } ),
+							channel.localQueue.sent[key].v
+						);
+					} catch ( error ) {
+						reject( error );
+					}
+					resolve();
 				} )
-				// We receive a remote change from "Hello world" to "Hello kansas"
-				channel.handleMessage( 'c:' + JSON.stringify( [{
-					o: 'M', ev: 2, sv: 1, cv: 'cv1', id: key, v: remoteDiff
-				}] ) );
-			} );
+			} )
 
-			// We're changing "Hello world" to "Goodbye world"
-			bucket.update( key, {title: 'Goodbye world'} );
+			// We're changing "Hello world" to "Goodbye world", not syncing yet though
+			// so there is no sent change when the next inbound change comes
+			bucket.update( key, {title: 'Goodbye world'}, {}, { sync: false } );
+
+			// We receive a remote change from "Hello world" to "Hello kansas"
+			channel.handleMessage( 'c:' + JSON.stringify( [{
+				o: 'M', ev: 2, sv: 1, cv: 'cv1', id: key, ccid: 'remote', v: remoteDiff
+			}] ) );
 		} ) );
 
 		/**
@@ -418,6 +416,57 @@ describe( 'Channel', function() {
 			// We're changing "Hello world" to "Goodbye world"
 			bucket.update( key, {title: 'Goodbye world'} );
 		} ) );
+
+		it( 'should not rebase local changes waiting for confirmation from the server', async () => {
+			await channel.store.put( 'thing', 1, { content: 'AC' } );
+
+			const onSentChange = new Promise( resolve => channel.once( 'send', resolve ) );
+
+			channel.localQueue.queue( {
+				type: 'modify',
+				object: { content: 'ACD' },
+				id: 'thing',
+			} );
+
+			const sentChange = await onSentChange;
+			const failure = new Promise( ( resolve, reject ) => {
+				channel.once( 'send', () => reject( new Error( 'Should not re-send changes which are already outbound' ) ) );
+			} );
+
+			const ghost = await channel.store.get( 'thing' );
+			deepEqual( ghost.data, { content: 'AC' } );
+
+			channel.handleMessage( 'c:' + JSON.stringify( [ {
+				id: 'thing',
+				o: 'M',
+				sv: 1,
+				ev: 2,
+				ccids: [ 'remote' ],
+				v: diff( { content: 'AC' }, { content: 'ABC' } )
+			} ] ) );
+
+			await channel.store.get( 'thing' );
+
+			return Promise.race( [
+				failure,
+				new Promise( resolve => {
+					channel.once( 'acknowledge', async () => {
+						const ghost = await channel.store.get( 'thing' );
+						deepEqual( ghost.data, { content: 'ABCD' } );
+						resolve();
+					} );
+
+					channel.handleMessage( 'c:' + JSON.stringify( [ {
+						id: 'thing',
+						o: 'M',
+						sv: 2,
+						ev: 3,
+						ccids: [ JSON.parse( parseMessage( sentChange ).data ).ccid ],
+						v: diff( { content: 'ABC' }, { content: 'ABCD' } )
+					} ] ) );
+				} )
+			] );
+		} );
 
 		it( 'should emit errors on the bucket instance', ( done ) => {
 			const error = {error: 404, id: 'thing', ccids: ['abc']}

@@ -116,7 +116,7 @@ internal.removeAndSend = function( id ) {
 internal.updateObjectVersion = function( id, version, data, original, patch, acknowledged ) {
 	const save = () => this.store.put( id, version, data );
 
-	if ( acknowledged ) {
+	if ( acknowledged || this.localQueue.sent[id] ) {
 		return save().then( () => {
 			internal.updateAcknowledged.call( this, acknowledged );
 		} );
@@ -135,17 +135,16 @@ internal.updateObjectVersion = function( id, version, data, original, patch, ack
 			// remove pending changes
 			this.localQueue.dequeueChangesFor( id );
 
-			let update = data;
-
-			// if the rebase operation results in a modified object
-			// generate a new patch and queue it to be sent to simperium
-			if ( transformed ) {
-				update = change_util.apply( transformed, data );
-				// queue up the new change
-				this.localQueue.queue( { type: 'modify', id, object: update } );
-			}
-
 			return save().then( () => {
+				let update = data;
+				// if the rebase operation results in a modified object
+				// generate a new patch and queue it to be sent to simperium
+				if ( transformed ) {
+					update = change_util.apply( transformed, data );
+					// queue up the new change
+					this.localQueue.queue( { type: 'modify', id, object: update } );
+				}
+
 				this.emit( 'update', id, update, original, patch, this.isIndexing );
 			} );
 		} );
