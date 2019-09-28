@@ -854,11 +854,10 @@ LocalQueue.prototype.compressAndSend = function( id, ghost ) {
 
 	change = buildOperation( sending, ghost );
 	this.queues[id] = [];
-	this.sent[id] = change;
 	if ( change_util.isEmptyChange( change ) ) {
 		return;
 	}
-
+	this.sent[id] = change;
 	this.emit( 'send', change );
 }
 
