@@ -214,14 +214,14 @@ Bucket.prototype.setChannel = function( channel ) {
 	// Sets up a default network change subscriber that triggers a channel
 	// change operation. This will queue up any changes that exist that
 	// may have not been added to the local queue yet
-	channel.subscribe( ( id, ... args ) => {
-		const subscriber = this.subscriber
+	channel.beforeNetworkChange( ( id, ... args ) => {
+		const changeResolver = this.changeResolver
 			// if there is a subcriber, let it handle the network change
-			? Promise.resolve( this.subscriber( id, ... args ) )
+			? Promise.resolve( this.changeResolver( id, ... args ) )
 			// if no subscriber, resolving null will mean we should handle it
 			: Promise.resolve( null );
 
-		return subscriber
+		return changeResolver
 			.then( localState => {
 				// if subscriber provided local state of any truthy type use that
 				// as the object's local state
@@ -235,7 +235,7 @@ Bucket.prototype.setChannel = function( channel ) {
 };
 
 /**
- * @callback NetworkChangeSubscriber
+ * @callback NetworkChangeResolver
  * @param { string } key - bucket object being changed
  * @param { Object } data - the new object data
  * @param { Object } base - the object data before the patch is applied
@@ -248,10 +248,10 @@ Bucket.prototype.setChannel = function( channel ) {
  * did not originate on this client. Can be used to save an object before
  * network changes are applied.
  *
- * @param {NetworkChangeSubcriber} subscriber - callback executed when network changes for this bucket are going to be applied
+ * @param {NetworkChangeResolver} changeResolver - callback executed when network changes for this bucket are going to be applied
  */
-Bucket.prototype.subscribe = function( subscriber ) {
-	this.subscriber = subscriber;
+Bucket.prototype.beforeNetworkChange = function( changeResolver ) {
+	this.changeResolver = changeResolver;
 }
 
 /**

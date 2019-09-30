@@ -81,14 +81,12 @@ describe( 'Bucket', () => {
 		} );
 	} );
 
-
 	describe( 'stored objects', () => {
 		beforeEach( () => {
 			store.objects = {
 				thing: { other: 'thing' }
 			};
 		} );
-
 
 		it( 'should fetch object version callback', ( done ) => {
 			bucket.getVersion( 'thing', ( error, version ) => {
@@ -104,22 +102,22 @@ describe( 'Bucket', () => {
 		} );
 
 		it( 'should provide object local state', () => {
-			return channel.subscriber( 'thing' ).then( local => {
+			return channel.changeResolver( 'thing' ).then( local => {
 				deepEqual( local, store.objects.thing );
 			} )
 		} );
 
 		it( 'should allow subscriber to provide local state', () => {
 			const expected = { something: 'else' };
-			bucket.subscribe( () => expected );
-			return channel.subscriber( 'thing' ).then( local => {
+			bucket.beforeNetworkChange( () => expected );
+			return channel.changeResolver( 'thing' ).then( local => {
 				deepEqual( local, expected );
 			} );
 		} )
 
 		it( 'should provide state when subscriber returns null', () => {
-			bucket.subscribe( () => null );
-			return channel.subscriber( 'thing' ).then( local => {
+			bucket.beforeNetworkChange( () => null );
+			return channel.changeResolver( 'thing' ).then( local => {
 				deepEqual( local, store.objects.thing );
 			} );
 		} );
