@@ -196,7 +196,63 @@ Bucket.prototype.setChannel = function( channel ) {
 		.on( 'update', this.onChannelUpdate )
 		.on( 'indexingStateChange', this.onChannelIndexingStateChange )
 		.on( 'remove', this.onChannelRemove );
+
+	/**
+	 * Fetch the current state for a given id in the datastore
+	 *
+	 * @param {string} id - object to fetch current state for
+	 * @returns {Promise<Object|null>} local state or null if no state to provide
+	 */
+	const localStateForKey = ( id ) => {
+		return this.get( id ).then( ( object ) => {
+			if ( object ) {
+				return object.data;
+			}
+		} );
+	}
+
+	// Sets up a default network change subscriber that triggers a channel
+	// change operation. This will queue up any changes that exist that
+	// may have not been added to the local queue yet
+	channel.beforeNetworkChange( ( id, ... args ) => {
+		const changeResolver = this.changeResolver
+			// if there is a subcriber, let it handle the network change
+			? Promise.resolve( this.changeResolver( id, ... args ) )
+			// if no subscriber, resolving null will mean we should handle it
+			: Promise.resolve( null );
+
+		return changeResolver
+			.then( localState => {
+				// if subscriber provided local state of any truthy type use that
+				// as the object's local state
+				if ( localState ) {
+					return localState;
+				}
+				// Subscriber did not provide local state, fetch it from the datastore
+				return localStateForKey( id );
+			} )
+	} );
 };
+
+/**
+ * @callback NetworkChangeResolver
+ * @param { string } key - bucket object being changed
+ * @param { Object } data - the new object data
+ * @param { Object } base - the object data before the patch is applied
+ * @param { Object } patch - the patch used to bring base to data
+ * @returns { Object | null | Promise<Object | null> } - resolve when network change should be applied
+ */
+
+/**
+ * Subscribe to changes to this bucket that are coming from simperium that
+ * did not originate on this client. Can be used to save an object before
+ * network changes are applied.
+ *
+ * @param {NetworkChangeResolver} changeResolver - callback executed when network changes for this bucket are going to be applied
+ */
+Bucket.prototype.beforeNetworkChange = function( changeResolver ) {
+	this.changeResolver = changeResolver;
+}
 
 /**
  * Reloads all the data from the currently cached set of ghost data
@@ -259,8 +315,10 @@ Bucket.prototype.update = function( id, data, remoteUpdateInfo, options, callbac
 
 	const task = this.storeAPI.update( id, data, this.isIndexing )
 		.then( bucketObject => {
+			return this.channel.update( bucketObject, options.sync );
+		} )
+		.then( bucketObject => {
 			this.emit( 'update', id, bucketObject.data, remoteUpdateInfo );
-			this.channel.update( bucketObject, options.sync );
 			return bucketObject;
 		} );
 	return deprecateCallback( callback, task );
@@ -307,11 +365,15 @@ Bucket.prototype.getVersion = function( id, callback ) {
  *
  * @param {String} id - object to sync
  * @param {?bucketStoreGetCallback} callback - optional callback
- * @returns {Promise<Object>} - object id, data
+ * @returns {Promise<BucketObject>} - object id, data
  */
 Bucket.prototype.touch = function( id, callback ) {
 	const task = this.storeAPI.get( id )
-		.then( object => this.update( object.id, object.data ) );
+		.then( object => {
+			if ( object ) {
+				return this.update( object.id, object.data );
+			}
+		} );
 
 	return deprecateCallback( callback, task );
 };

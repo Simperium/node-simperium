@@ -3,6 +3,7 @@ import { format, inherits } from 'util'
 import { EventEmitter } from 'events'
 import { parseMessage, parseVersionMessage, change as change_util } from './util'
 import { v4 as uuid } from 'uuid'
+import buildOperation from './util/operation';
 
 const UNKNOWN_CV = '?';
 const CODE_INVALID_VERSION = 405;
@@ -11,8 +12,8 @@ const CODE_EMPTY_RESPONSE = 412;
 const CODE_INVALID_DIFF = 440;
 
 const operation = {
-	MODIFY: 'M',
-	REMOVE: '-'
+	MODIFY: change_util.type.MODIFY,
+	REMOVE: change_util.type.REMOVE
 };
 
 // internal methods used as instance methods on a Channel instance
@@ -42,7 +43,6 @@ internal.updateChangeVersion = function( cv ) {
 internal.changeObject = function( id, change ) {
 	// pull out the object from the store and apply the change delta
 	var applyChange = internal.performChange.bind( this, change );
-
 	this.networkQueue.queueFor( id ).add( function( done ) {
 		return applyChange().then( done, done );
 	} );
@@ -70,13 +70,13 @@ internal.buildModifyChange = function( id, object, ghost ) {
 		}
 	}
 
+	// if the change v is an empty object, do not send, notify?
 	if ( empty ) {
 		this.emit( 'unmodified', id, object, ghost );
 		return;
 	}
 
-	// if the change v is an empty object, do not send, notify?
-	this.localQueue.queue( payload );
+	this.localQueue.queue( { type: 'modify', id, object } );
 };
 
 /**
@@ -87,9 +87,8 @@ internal.buildModifyChange = function( id, object, ghost ) {
  * @param {String} id - object to remove
  * @param {Object} ghost - current ghost object for the given id
  */
-internal.buildRemoveChange = function( id, ghost ) {
-	var payload = change_util.buildChange( change_util.type.REMOVE, id, {}, ghost );
-	this.localQueue.queue( payload );
+internal.buildRemoveChange = function( id ) {
+	this.localQueue.queue( { type: 'remove', id } );
 };
 
 internal.diffAndSend = function( id, object ) {
@@ -102,42 +101,53 @@ internal.removeAndSend = function( id ) {
 	return this.store.get( id ).then( remove );
 };
 
-// We've receive a full object from the network. Update the local instance and
-// notify of the new object version
+/**
+ * Updates the ghost store with the updated ghost data based on the data that
+ * comes from applying the patch to the original.
+ *
+ * @param { string } id - the bucket object key for the object being updated
+ * @param { number } version - the version number the ghost is being updated to
+ * @param { Object } data - the new data for the ghost for this version
+ * @param { Object } original - the original data for the ghost before patch is applied
+ * @param { Object } patch - the patch applied to the original to get the resulting data
+ * @param { Object } [acknowledged ] - the change sent by this client matching the received network change
+ * @returns { Promise<*> } resolves once the ghost has been updated
+ */
 internal.updateObjectVersion = function( id, version, data, original, patch, acknowledged ) {
-	var notify,
-		changes,
-		change,
-		patch,
-		localModifications,
-		remoteModifications,
-		transformed,
-		update;
+	const save = () => this.store.put( id, version, data );
+
+	if ( acknowledged ) {
+		return save().then( () => {
+			internal.updateAcknowledged.call( this, acknowledged );
+		} );
+	}
+
 	// If it's not an ack, it's a change initiated on a different client
 	// we need to provide a way for the current client to respond to
 	// a potential conflict if it has modifications that have not been synced
-	if ( !acknowledged && !this.localQueue.sent[id] ) {
-		changes = this.localQueue.dequeueChangesFor( id );
-		localModifications = change_util.compressChanges( changes, original );
-		remoteModifications = patch;
-		transformed = change_util.transform( localModifications, remoteModifications, original );
-		update = data;
+	return this.onBeforeNetworkChange( id, data, original, patch )
+		.then( ( local ) => {
+			// pull all pending changes in the local queue for the object of id
+			const localModifications = change_util.diff( original, local ),
+				// rebases the local changes on top of the network patch
+				transformed = change_util.transform( localModifications, patch, original );
 
-		// apply the transformed patch and emit the update
-		if ( transformed ) {
-			patch = transformed;
-			update = change_util.apply( transformed, data );
-			// queue up the new change
-			change = change_util.modify( id, version, patch );
-			this.localQueue.queue( change );
-		}
+			// remove pending changes
+			this.localQueue.dequeueChangesFor( id );
 
-		notify = this.emit.bind( this, 'update', id, update, original, patch, this.isIndexing );
-	} else {
-		notify = internal.updateAcknowledged.bind( this, acknowledged );
-	}
+			return save().then( () => {
+				let update = data;
+				// if the rebase operation results in a modified object
+				// generate a new patch and queue it to be sent to simperium
+				if ( transformed ) {
+					update = change_util.apply( transformed, data );
+					// queue up the new change
+					this.localQueue.queue( { type: 'modify', id, object: update } );
+				}
 
-	return this.store.put( id, version, data ).then( notify );
+				this.emit( 'update', id, update, original, patch, this.isIndexing );
+			} );
+		} );
 };
 
 internal.removeObject = function( id, acknowledged ) {
@@ -183,7 +193,7 @@ internal.requestObjectVersion = function( id, version ) {
 };
 
 internal.applyChange = function( change, ghost ) {
-	const acknowledged = internal.findAcknowledgedChange.bind( this )( change ),
+	const acknowledged = internal.findAcknowledgedChange.call( this, change ),
 		updateChangeVersion = internal.updateChangeVersion.bind( this, change.cv );
 
 	let error,
@@ -228,11 +238,9 @@ internal.handleChangeError = function( err, change, acknowledged ) {
 	switch ( err.code ) {
 		case CODE_INVALID_VERSION:
 		case CODE_INVALID_DIFF: // Invalid version or diff, send full object back to server
-			if ( ! change.hasSentFullObject ) {
+			if ( ! acknowledged || ! acknowledged.d ) {
 				this.store.get( change.id ).then( object => {
-					change.d = object;
-					change.hasSentFullObject = true;
-					this.localQueue.queue( change );
+					this.localQueue.queue( { type: 'full', originalChange: acknowledged, object } );
 				} );
 			} else {
 				this.localQueue.dequeueChangesFor( change.id );
@@ -347,7 +355,6 @@ internal.indexingComplete = function() {
  * @returns {Promise<Void>} - resolves once the change version is saved
  */
 
-
 /**
  * Maintains syncing state for a Simperium bucket.
  *
@@ -416,12 +423,16 @@ inherits( Channel, EventEmitter );
  *
  * @param {BucketObject} object - the bucket object
  * @param {Boolean} [sync=true] - if the object should be synced
+ * @returns {Promise<BucketObject>} the bucket object
  */
 Channel.prototype.update = function( object, sync = true ) {
 	this.onBucketUpdate( object.id );
 	if ( sync === true ) {
-		internal.diffAndSend.call( this, object.id, object.data );
+		return internal
+			.diffAndSend.call( this, object.id, object.data )
+			.then( () => object );
 	}
+	return Promise.resolve( object );
 };
 
 /**
@@ -490,6 +501,22 @@ Channel.prototype.getVersion = function( id ) {
 		return 0;
 	} );
 }
+
+/**
+ * Subscription interface for network changes.
+ * @param { NetworkChangeResolver } changeResolver - function used to subscribe to network changes modifying a
+ *                                    bucket object
+ */
+Channel.prototype.beforeNetworkChange = function( changeResolver ) {
+	this.changeResolver = changeResolver;
+};
+
+Channel.prototype.onBeforeNetworkChange = function( id, data, base, patch ) {
+	if ( this.changeResolver ) {
+		return Promise.resolve( this.changeResolver( id, data, base, patch ) );
+	}
+	return Promise.resolve();
+};
 
 /**
  * Receives incoming messages from Simperium
@@ -775,7 +802,7 @@ LocalQueue.prototype.dequeueChangesFor = function( id ) {
 	var changes = [], sent = this.sent[id], queue = this.queues[id];
 
 	if ( sent ) {
-		delete this.sent[id];
+		this.sent[id];
 		changes.push( sent );
 	}
 
@@ -805,16 +832,12 @@ LocalQueue.prototype.processQueue = function( id ) {
 		this.emit( 'wait', id );
 		return;
 	}
-
 	this.store.get( id ).then( compressAndSend );
 }
 
 LocalQueue.prototype.compressAndSend = function( id, ghost ) {
 	var changes = this.queues[id];
 	var change;
-	var target = ghost.data;
-	var c;
-	var type;
 
 	// a change was sent before we could compress and send
 	if ( this.sent[id] ) {
@@ -822,34 +845,18 @@ LocalQueue.prototype.compressAndSend = function( id, ghost ) {
 		return;
 	}
 
-	if ( changes.length === 1 ) {
-		change = changes.shift();
-		this.sent[id] = change;
-		this.emit( 'send', change );
+	const sending = changes.reduce( ( chosen, next ) => {
+		if ( chosen.type === 'remove' ) {
+			return chosen;
+		}
+		return next;
+	} );
+
+	change = buildOperation( sending, ghost );
+	this.queues[id] = [];
+	if ( change_util.isEmptyChange( change ) ) {
 		return;
 	}
-
-	if ( changes.length > 1 && changes[0].type === change_util.type.REMOVE ) {
-		change = changes.shift();
-		changes.splice( 0, changes.length - 1 );
-		this.sent[id] = change;
-		this.emit( 'send', change );
-	}
-
-	while ( changes.length > 0 ) {
-		c = changes.shift();
-
-		if ( c.o === change_util.type.REMOVE ) {
-			changes.unshift( c );
-			break;
-		}
-
-		target = change_util.apply( c.v, target );
-	}
-
-	type = target === null ? change_util.type.REMOVE : change_util.type.MODIFY;
-	change = change_util.buildChange( type, id, target, ghost );
-
 	this.sent[id] = change;
 	this.emit( 'send', change );
 }
