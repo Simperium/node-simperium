@@ -510,16 +510,16 @@ Channel.prototype.getVersion = function( id ) {
 
 /**
  * Subscription interface for network changes.
- * @param { Subscriber } subscriber - function used to subscribe to network changes modifying a
+ * @param { NetworkChangeResolver } changeResolver - function used to subscribe to network changes modifying a
  *                                    bucket object
  */
-Channel.prototype.subscribe = function( subscriber ) {
-	this.subscriber = subscriber;
+Channel.prototype.beforeNetworkChange = function( changeResolver ) {
+	this.changeResolver = changeResolver;
 };
 
 Channel.prototype.onBeforeNetworkChange = function( id, data, base, patch ) {
-	if ( this.subscriber ) {
-		return Promise.resolve( this.subscriber( id, data, base, patch ) );
+	if ( this.changeResolver ) {
+		return Promise.resolve( this.changeResolver( id, data, base, patch ) );
 	}
 	return Promise.resolve();
 };

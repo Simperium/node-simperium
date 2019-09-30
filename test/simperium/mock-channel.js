@@ -12,7 +12,7 @@ export class MockChannel extends EventEmitter {
 	remove() {
 	}
 
-	subscribe( subscriber ) {
-		this.subscriber = subscriber;
+	beforeNetworkChange( changeResolver ) {
+		this.changeResolver = changeResolver;
 	}
 };
