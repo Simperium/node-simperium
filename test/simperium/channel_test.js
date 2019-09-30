@@ -108,7 +108,7 @@ describe( 'Channel', function() {
 				done();
 			} );
 
-			bucket.update( '12345', {content: 'Hola mundo!'});
+			bucket.update( '12345', {content: 'Hola mundo!'} );
 		} );
 
 		it( 'should not send a change with an empty diff', function( done ) {
@@ -219,7 +219,7 @@ describe( 'Channel', function() {
 			var validate = fn.counts( 1, function() {
 				var queue = channel.localQueue.queues['123'];
 				equal( queue.length, 2 );
-				equal( queue.slice( -1 )[0].o, '-' );
+				deepEqual( queue.slice( -1 )[0], { type: 'remove', id: '123' } );
 				done();
 			} );
 
@@ -347,8 +347,8 @@ describe( 'Channel', function() {
 						// the channel will send the diff that results from the rebased
 						// object and the latest ghost
 						deepEqual(
-							channel.localQueue.sent[key].v,
-							diff( { title: 'Hello kansas' }, { title: 'Goodbye kansas' } )
+							diff( { title: 'Hello kansas' }, { title: 'Goodbye kansas' } ),
+							channel.localQueue.sent[key].v
 						);
 					} catch ( error ) {
 						reject( error );
@@ -363,7 +363,7 @@ describe( 'Channel', function() {
 
 			// We receive a remote change from "Hello world" to "Hello kansas"
 			channel.handleMessage( 'c:' + JSON.stringify( [{
-				o: 'M', ev: 2, sv: 1, cv: 'cv1', id: key, v: remoteDiff
+				o: 'M', ev: 2, sv: 1, cv: 'cv1', id: key, ccid: 'remote', v: remoteDiff
 			}] ) );
 		} ) );
 
@@ -420,17 +420,18 @@ describe( 'Channel', function() {
 		it( 'should not rebase local changes waiting for confirmation from the server', async () => {
 			await channel.store.put( 'thing', 1, { content: 'AC' } );
 
+			const onSentChange = new Promise( resolve => channel.once( 'send', resolve ) );
+
 			channel.localQueue.queue( {
+				type: 'modify',
+				object: { content: 'ACD' },
 				id: 'thing',
-				o: 'M',
-				sv: 1,
-				ev: 2,
-				ccid: 'local',
-				v: diff( { content: 'AC' }, { content: 'ACD' } )
 			} );
 
-			await new Promise( resolve => channel.once( 'send', resolve ) );
-			channel.once( 'send', () => done( 'Should not re-send changes which are already outbound' ) );
+			const sentChange = await onSentChange;
+			const failure = new Promise( ( resolve, reject ) => {
+				channel.once( 'send', () => reject( new Error( 'Should not re-send changes which are already outbound' ) ) );
+			} );
 
 			const ghost = await channel.store.get( 'thing' );
 			deepEqual( ghost.data, { content: 'AC' } );
@@ -446,22 +447,25 @@ describe( 'Channel', function() {
 
 			await channel.store.get( 'thing' );
 
-			return new Promise( resolve => {
-				channel.once( 'acknowledge', async () => {
-					const ghost = await channel.store.get( 'thing' );
-					deepEqual( ghost.data, { content: 'ABCD' } );
-					resolve();
-				} );
+			return Promise.race( [
+				failure,
+				new Promise( resolve => {
+					channel.once( 'acknowledge', async () => {
+						const ghost = await channel.store.get( 'thing' );
+						deepEqual( ghost.data, { content: 'ABCD' } );
+						resolve();
+					} );
 
-				channel.handleMessage( 'c:' + JSON.stringify( [ {
-					id: 'thing',
-					o: 'M',
-					sv: 2,
-					ev: 3,
-					ccids: [ 'local' ],
-					v: diff( { content: 'ABC' }, { content: 'ABCD' } )
-				} ] ) )
-			} );
+					channel.handleMessage( 'c:' + JSON.stringify( [ {
+						id: 'thing',
+						o: 'M',
+						sv: 2,
+						ev: 3,
+						ccids: [ JSON.parse( parseMessage( sentChange ).data ).ccid ],
+						v: diff( { content: 'ABC' }, { content: 'ABCD' } )
+					} ] ) );
+				} )
+			] );
 		} );
 
 		it( 'should emit errors on the bucket instance', ( done ) => {
@@ -477,7 +481,6 @@ describe( 'Channel', function() {
 		it( 'should ignore 412 change errors', function( done ) {
 			// if a change is sent and acknowledged with a 412, change should be dequeued and
 			// no error should be emitted
-			var change = {o: 'M', id: 'thing', ev: 2, ccid: 'abc', v: diff( {}, {hello: 'world'} ) };
 
 			// channel should not emit error during this change
 			channel.on( 'error', function( e ) {
@@ -493,29 +496,29 @@ describe( 'Channel', function() {
 				} );
 
 				// listen for change to be sent
-				channel.localQueue.once( 'send', function() {
+				channel.localQueue.once( 'send', function( change ) {
 					ok( channel.localQueue.sent.thing );
 					// send a 412 response
-					channel.handleMessage( 'c:' + JSON.stringify( [{error: 412, id: 'thing', ccids: ['abc']}] ) );
+					channel.handleMessage( 'c:' + JSON.stringify( [{error: 412, id: 'thing', ccids: [ change.ccid ]}] ) );
 				} );
 				// queue up the change
-				channel.localQueue.queue( change );
+				channel.localQueue.queue( { type: 'modify', id: 'thing', object: { hello: 'world' } }, { version: 1, data: {} } );
 			} );
 		} );
 
 		it( 'should send full object on 405 error', function( done ) {
 			// if a change is sent and a 405 is returned, the full object should be sent
 			// Add an object to the store
-			channel.store.put( 'thing', 1, {} );
+			channel.store.put( 'thing', 1, { key: 'value' } );
 
 			// channel should not emit error during this change
 			channel.on( 'error', function( e ) {
 				done( e );
 			} );
 
-			// ensure that a change with a `d` property is added to the queue
+			// ensure that a change to send the full object is added to the queue
 			channel.localQueue.once( 'queued', function( id, change, queue ) {
-				ok( queue[0].d );
+				equal( queue[0].type, 'full' );
 				done();
 			} );
 
@@ -524,11 +527,15 @@ describe( 'Channel', function() {
 		} );
 
 		it( 'should stop sending duplicate changes after receiving a 409', done => {
-			const change = {o: 'M', id: 'thing', sv: 1, ccid: 'duplicate', v: diff( {}, {key: 'value'} )};
+			const change = {
+				type: 'modify',
+				id: 'thing',
+				object: { key: 'value' },
+			}
 
 			channel.localQueue.queue( change );
 
-			channel.once( 'send', () => {
+			channel.once( 'send', ( outbound ) => {
 				// we should sent out our change the first time
 				bucket.once( 'error', done );
 				channel.localQueue.once( 'queued', () => done( 'Should not queue duplicate changes' ) );
@@ -537,7 +544,7 @@ describe( 'Channel', function() {
 				channel.handleMessage( 'c:' + JSON.stringify( [{
 					id: 'thing',
 					error: 409,
-					ccids: ['duplicate']
+					ccids: [JSON.parse( parseMessage( outbound ).data ).ccid]
 				}] ) );
 			} );
 		} );
