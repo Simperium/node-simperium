@@ -116,7 +116,7 @@ internal.removeAndSend = function( id ) {
 internal.updateObjectVersion = function( id, version, data, original, patch, acknowledged ) {
 	const save = () => this.store.put( id, version, data );
 
-	if ( acknowledged || this.localQueue.sent[id] ) {
+	if ( acknowledged ) {
 		return save().then( () => {
 			internal.updateAcknowledged.call( this, acknowledged );
 		} );
