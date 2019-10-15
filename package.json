@@ -26,16 +26,16 @@
     "websocket": "1.0.30"
   },
   "devDependencies": {
-    "@babel/cli": "7.5.5",
-    "@babel/core": "7.5.5",
-    "@babel/plugin-proposal-object-rest-spread": "7.5.5",
-    "@babel/preset-env": "7.5.5",
+    "@babel/cli": "7.6.4",
+    "@babel/core": "7.6.4",
+    "@babel/plugin-proposal-object-rest-spread": "7.6.2",
+    "@babel/preset-env": "7.6.3",
     "@babel/preset-flow": "7.0.0",
-    "@babel/register": "7.5.5",
-    "babel-eslint": "10.0.2",
-    "eslint": "^6.4.0",
-    "flow-bin": "0.104.0",
-    "mocha": "6.2.0",
+    "@babel/register": "7.6.2",
+    "babel-eslint": "10.0.3",
+    "eslint": "6.5.1",
+    "flow-bin": "0.109.0",
+    "mocha": "6.2.1",
     "nyc": "14.1.1"
   }
 }
