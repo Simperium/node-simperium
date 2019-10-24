@@ -179,6 +179,10 @@ Client.prototype.sendChannelMessage = function( id, message ) {
 };
 
 Client.prototype.connect = function() {
+	if ( this.open ) {
+		this.disconnect();
+	}
+
 	this.reconnect = true;
 	this.socket = this.options.websocketClientProvider( this.options.url );
 
