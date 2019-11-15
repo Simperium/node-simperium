@@ -1,8 +1,8 @@
 /*eslint no-shadow: 0*/
-import { format, inherits } from 'util'
-import { EventEmitter } from 'events'
-import { parseMessage, parseVersionMessage, change as change_util } from './util'
-import { v4 as uuid } from 'uuid'
+import {format, inherits} from 'util'
+import {EventEmitter} from 'events'
+import {change as change_util, parseMessage, parseVersionMessage} from './util'
+import {v4 as uuid} from 'uuid'
 import buildOperation from './util/operation';
 
 const UNKNOWN_CV = '?';
@@ -30,21 +30,6 @@ internal.updateChangeVersion = function( cv ) {
 		// A unit test currently relies on this event, otherwise we can remove it
 		this.emit( 'change-version', cv );
 		return cv;
-	} );
-};
-
-/**
- * Called when receive a change from the network. Attempt to apply the change
- * to the ghost object and notify.
- *
- * @param {String} id - id of the object changed
- * @param {Object} change - the change to apply to the object
- */
-internal.changeObject = function( id, change ) {
-	// pull out the object from the store and apply the change delta
-	var applyChange = internal.performChange.bind( this, change );
-	this.networkQueue.queueFor( id ).add( function( done ) {
-		return applyChange().then( done, done );
 	} );
 };
 
@@ -77,28 +62,6 @@ internal.buildModifyChange = function( id, object, ghost ) {
 	}
 
 	this.localQueue.queue( { type: 'modify', id, object } );
-};
-
-/**
- * Creates a change object that deletes an object from a bucket.
- *
- * Queues the change for syncing.
- *
- * @param {String} id - object to remove
- * @param {Object} ghost - current ghost object for the given id
- */
-internal.buildRemoveChange = function( id ) {
-	this.localQueue.queue( { type: 'remove', id } );
-};
-
-internal.diffAndSend = function( id, object ) {
-	var modify = internal.buildModifyChange.bind( this, id, object );
-	return this.store.get( id ).then( modify );
-};
-
-internal.removeAndSend = function( id ) {
-	var remove = internal.buildRemoveChange.bind( this, id );
-	return this.store.get( id ).then( remove );
 };
 
 /**
@@ -167,11 +130,6 @@ internal.updateAcknowledged = function( change ) {
 		this.localQueue.acknowledge( change );
 		this.emit( 'acknowledge', id, change );
 	}
-};
-
-internal.performChange = function( change ) {
-	var success = internal.applyChange.bind( this, change );
-	return this.store.get( change.id ).then( success );
 };
 
 internal.findAcknowledgedChange = function( change ) {
@@ -427,9 +385,10 @@ inherits( Channel, EventEmitter );
  */
 Channel.prototype.update = function( object, sync = true ) {
 	this.onBucketUpdate( object.id );
+
 	if ( sync === true ) {
-		return internal
-			.diffAndSend.call( this, object.id, object.data )
+		return this.store.get( object.id )
+			.then( ghost => internal.buildModifyChange.call( this, object.id, object.data, ghost ) )
 			.then( () => object );
 	}
 	return Promise.resolve( object );
@@ -452,7 +411,7 @@ Channel.prototype.setIsIndexing = function( isIndexing ) {
  * @param {String} id - the id of the object to remove
  */
 Channel.prototype.remove = function( id ) {
-	internal.removeAndSend.call( this, id )
+	this.store.get( id ).then( () => this.localQueue.queue( { type: 'remove', id } ) );
 }
 
 /**
@@ -484,7 +443,7 @@ Channel.prototype.getRevisions = function( id ) {
  * @returns {Promise<Boolean>} true if there are still changes to sync
  */
 Channel.prototype.hasLocalChanges = function() {
-	return Promise.resolve( this.localQueue.hasChanges() );
+	return Promise.resolve( Object.keys( this.localQueue.queues ).length > 0 );
 }
 
 /**
@@ -663,12 +622,16 @@ Channel.prototype.sendChangeVersionRequest = function( cv ) {
 	this.send( format( 'cv:%s', cv ) );
 };
 
-Channel.prototype.onChanges = function( data ) {
-	var changes = JSON.parse( data ),
-		onChange = internal.changeObject.bind( this );
-
-	changes.forEach( function( change ) {
-		onChange( change.id, change );
+Channel.prototype.onChanges = function( changes ) {
+	JSON.parse( changes ).forEach( change => {
+		// pull out the object from the store and apply the change delta
+		this.networkQueue
+			.queueFor( change.id )
+			.add(
+				done => this.store.get( change.id )
+					.then( ghost => internal.applyChange.call( this, change, ghost ) )
+					.then( done, done )
+			);
 	} );
 	// emit ready after all server changes have been applied
 	this.emit( 'ready' );
@@ -794,15 +757,10 @@ LocalQueue.prototype.queue = function( change ) {
 	this.processQueue( change.id );
 };
 
-LocalQueue.prototype.hasChanges = function() {
-	return Object.keys( this.queues ).length > 0;
-};
-
 LocalQueue.prototype.dequeueChangesFor = function( id ) {
 	var changes = [], sent = this.sent[id], queue = this.queues[id];
 
 	if ( sent ) {
-		this.sent[id];
 		changes.push( sent );
 	}
 
@@ -816,7 +774,6 @@ LocalQueue.prototype.dequeueChangesFor = function( id ) {
 
 LocalQueue.prototype.processQueue = function( id ) {
 	var queue = this.queues[id];
-	var compressAndSend = this.compressAndSend.bind( this, id );
 
 	// there is no queue, don't do anything
 	if ( !queue ) return;
@@ -832,34 +789,29 @@ LocalQueue.prototype.processQueue = function( id ) {
 		this.emit( 'wait', id );
 		return;
 	}
-	this.store.get( id ).then( compressAndSend );
-}
 
-LocalQueue.prototype.compressAndSend = function( id, ghost ) {
-	var changes = this.queues[id];
-	var change;
+	this.store.get( id ).then( ghost => {
+		const changes = this.queues[id];
 
-	// a change was sent before we could compress and send
-	if ( this.sent[id] ) {
-		this.emit( 'wait', id );
-		return;
-	}
-
-	const sending = changes.reduce( ( chosen, next ) => {
-		if ( chosen.type === 'remove' ) {
-			return chosen;
+		// a change was sent before we could compress and send
+		if ( this.sent[id] ) {
+			this.emit( 'wait', id );
+			return;
 		}
-		return next;
-	} );
 
-	change = buildOperation( sending, ghost );
-	this.queues[id] = [];
-	if ( change_util.isEmptyChange( change ) ) {
-		return;
-	}
-	this.sent[id] = change;
-	this.emit( 'send', change );
-}
+		const sending = changes.reduce(
+			( chosen, next ) => 'remove' === chosen.type ? chosen : next
+		);
+
+		const change = buildOperation( sending, ghost );
+		this.queues[id] = [];
+		if ( change_util.isEmptyChange( change ) ) {
+			return;
+		}
+		this.sent[id] = change;
+		this.emit( 'send', change );
+	});
+};
 
 LocalQueue.prototype.resendSentChanges = function() {
 	for ( let ccid in this.sent ) {
