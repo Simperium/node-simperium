@@ -14,28 +14,28 @@
     "flow": "flow",
     "test:coverage": "nyc npm test",
     "test": "mocha --reporter dot --require @babel/register --require @babel/polyfill test/**",
-    "babel": "babel -q -d lib/ src/",
+    "babel": "babel --quiet -d lib/ src/",
     "lint": "eslint --quiet src/",
     "prepare": "npm run babel"
   },
   "author": "",
   "license": "BSD-2-Clause",
   "dependencies": {
-    "@babel/polyfill": "^7.6.0",
+    "@babel/polyfill": "7.7.0",
     "uuid": "3.3.3",
     "websocket": "1.0.30"
   },
   "devDependencies": {
-    "@babel/cli": "7.6.4",
-    "@babel/core": "7.6.4",
-    "@babel/plugin-proposal-object-rest-spread": "7.6.2",
-    "@babel/preset-env": "7.6.3",
-    "@babel/preset-flow": "7.0.0",
-    "@babel/register": "7.6.2",
+    "@babel/cli": "7.7.5",
+    "@babel/core": "7.7.5",
+    "@babel/plugin-proposal-object-rest-spread": "7.7.4",
+    "@babel/preset-env": "7.7.6",
+    "@babel/preset-flow": "7.7.4",
+    "@babel/register": "7.7.4",
     "babel-eslint": "10.0.3",
-    "eslint": "6.5.1",
-    "flow-bin": "0.109.0",
-    "mocha": "6.2.1",
+    "eslint": "6.7.2",
+    "flow-bin": "0.113.0",
+    "mocha": "6.2.2",
     "nyc": "14.1.1"
   }
 }
