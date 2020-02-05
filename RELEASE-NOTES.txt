@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.4
+
+ - Update diff-match-patch to newer revision of surrogate-pair encoding fix
+
 ## 1.0.2
 
  - Update diff-match-patch to fix problem when encoding consecutive surrogate pairs
