@@ -1,6 +1,6 @@
 {
   "name": "simperium",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "A simperium client for node.js",
   "main": "./lib/simperium/index.js",
   "repository": {
