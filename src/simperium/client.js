@@ -1,4 +1,4 @@
-import { format, inherits } from 'util'
+import inherits from 'inherits';
 import { EventEmitter } from 'events'
 import Bucket from './bucket'
 import Channel from './channel'
@@ -63,7 +63,7 @@ export default function Client( appId, accessToken, options ) {
 
 	this.appId = appId;
 
-	options.url = options.url || format( 'wss://api.simperium.com/sock/1/%s/websocket', this.appId );
+	options.url = options.url || `wss://api.simperium.com/sock/1/${ this.appId }/websocket`;
 
 	this.reconnect = true;
 
@@ -97,7 +97,7 @@ Client.prototype.bucket = function( name ) {
 	channel.on( 'send', send );
 
 	this.on( 'connect', channel.onConnect.bind( channel ) );
-	this.on( format( 'channel:%d', channelId ), receive );
+	this.on( `channel:${ channelId }`, receive );
 	this.on( 'access-token', function( token ) {
 		channel.access_token = token;
 	} );
@@ -154,14 +154,14 @@ Client.prototype.parseMessage = function( event ) {
 	this.emit( 'message', data );
 
 	if ( isNaN( channelId ) ) {
-		this.emit( format( 'message:%s', prefix ), channelMessage );
+		this.emit( `message:${ prefix }`, channelMessage );
 	} else {
-		this.emit( format( 'channel:%d', channelId ), channelMessage );
+		this.emit( `channel:${ channelId }`, channelMessage );
 	}
 };
 
 Client.prototype.sendHeartbeat = function( count ) {
-	this.send( format( 'h:%d', count ) );
+	this.send( `h:${ count }` );
 };
 
 Client.prototype.send = function( data ) {
@@ -175,7 +175,7 @@ Client.prototype.send = function( data ) {
 };
 
 Client.prototype.sendChannelMessage = function( id, message ) {
-	this.send( format( '%d:%s', id, message ) );
+	this.send( `${ id }:${ message }` );
 };
 
 Client.prototype.connect = function() {

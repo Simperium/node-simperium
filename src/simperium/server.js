@@ -1,6 +1,6 @@
 import { server as WebSocketServer } from 'websocket'
 import http from 'http'
-import { inherits, format } from 'util'
+import inherits from 'inherits';
 import { EventEmitter } from 'events'
 import { parseMessage } from './util'
 
@@ -46,7 +46,7 @@ Session.prototype.onMessage = function( msg ) {
 	if ( channelId === 'h' ) {
 		i = parseInt( message.data );
 		if ( isNaN( i ) ) i = 0;
-		this.connection.send( format( 'h:%d', i + 1 ) );
+		this.connection.send( `h:${ i + 1 }` );
 		return;
 	}
 
@@ -66,10 +66,10 @@ Session.prototype.getChannel = function( id ) {
 		this.channels[id] = channel;
 		channel
 		.on( 'send', function( data ) {
-			connection.send( format( '%d:%s', id, data ) );
+			connection.send( `${ id }:${ data }` );
 		} )
 		.on( 'unauthorized', function() {
-			connection.send( format( '%d:auth:%s', id, JSON.stringify( {code: 500} ) ) );
+			connection.send( `${ id }:auth:${ JSON.stringify( {code: 500} ) }` );
 			connection.close();
 		} );
 	}
@@ -108,7 +108,7 @@ Channel.prototype.init = function( data ) {
 
 	this.bucket.initialize( options, function( e, user ) {
 		if ( e ) return emit( 'unauthorized', e );
-		emit( 'send', format( 'auth:%s', user.email ) );
+		emit( 'send', `auth:${ user.email }` );
 	} );
 };
 

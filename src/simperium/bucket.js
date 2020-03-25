@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events'
-import { inherits } from 'util'
+import inherits from 'inherits';
 import { v4 as uuid } from 'uuid';
 
 /**

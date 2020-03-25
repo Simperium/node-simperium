@@ -25,6 +25,8 @@
   "license": "BSD-2-Clause",
   "dependencies": {
     "@babel/polyfill": "7.7.0",
+    "events": "3.1.0",
+    "inherits": "2.0.4",
     "uuid": "3.3.3",
     "websocket": "1.0.31"
   },
