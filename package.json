@@ -3,6 +3,9 @@
   "version": "1.0.4",
   "description": "A simperium client for node.js",
   "main": "./lib/simperium/index.js",
+  "browser": {
+    "./lib/simperium/http-request.js": "./lib/simperium/http-request.browser.js"
+  },
   "repository": {
     "type": "git",
     "url": "git://github.com/Simperium/node-simperium.git"
