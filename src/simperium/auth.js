@@ -1,7 +1,8 @@
 // @flow
 import events from 'events'
-import { request } from 'https'
 import url from 'url'
+
+import request from './http-request';
 
 // @flow
 type User = {
@@ -84,31 +85,15 @@ export class Auth extends EventEmitter {
 	}
 
 	request( endpoint: string, body: string ): Promise<User> {
-		return new Promise( ( resolve, reject ) => {
-			const req = request( this.getUrlOptions( endpoint ), ( res ) => {
-				let responseData = '';
-
-				res.on( 'data', ( data ) => {
-					responseData += data.toString();
-				} );
-
-				res.on( 'end', () => {
-					try {
-						const user = fromJSON( responseData );
-						resolve( user );
-						this.emit( 'authorize', user );
-					} catch ( error ) {
-						return reject( new AuthError( error ) );
-					}
-				} );
-			} );
-
-			req.on( 'error', ( e ) => {
-				reject( e );
-			} );
-
-			req.end( body );
-		} );
+		return request( endpoint, body, this.getUrlOptions( endpoint ) ).then( response => {
+			try {
+				const user = fromJSON( response );
+				this.emit( 'authorize', user );
+				return user;
+			} catch ( error ) {
+				throw new AuthError( error );
+			}
+		} )
 	}
 };
 
