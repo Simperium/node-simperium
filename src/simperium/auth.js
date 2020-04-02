@@ -75,7 +75,7 @@ export class Auth extends EventEmitter {
 	}
 
 	getUrlOptions( path: string ) {
-		const { port, ...options } = url.parse( `${URL}/${ this.appId }/${ path}` );
+		const { port, ...options } = url.parse( `${ URL }/${ this.appId }/${ path }` );
 		return {
 			... options,
 			port: port ? Number( port ) : undefined,
@@ -85,7 +85,7 @@ export class Auth extends EventEmitter {
 	}
 
 	request( endpoint: string, body: string ): Promise<User> {
-		return request( endpoint, body, this.getUrlOptions( endpoint ) ).then( response => {
+		return request( body, this.getUrlOptions( endpoint ) ).then( response => {
 			try {
 				const user = fromJSON( response );
 				this.emit( 'authorize', user );
