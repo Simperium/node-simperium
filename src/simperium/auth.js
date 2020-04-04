@@ -23,7 +23,7 @@ const fromJSON = ( json: string ): User => {
 
 const { EventEmitter } = events;
 
-const URL = 'https://auth.simperium.com/1';
+const baseUrl = 'https://auth.simperium.com/1';
 
 export class AuthError extends Error {
 	underlyingError: Error
@@ -75,13 +75,13 @@ export class Auth extends EventEmitter {
 	}
 
 	getUrlOptions( path: string ) {
-		const { port, ...options } = url.parse( `${ URL }/${ this.appId }/${ path }` );
-		return {
+		const { port, ...options } = url.parse( `${ baseUrl }/${ this.appId }/${ path }` );
+		return (({
 			... options,
 			port: port ? Number( port ) : undefined,
 			method: 'POST',
 			headers: {'X-Simperium-API-Key': this.appSecret }
-		};
+		}: any): URL & { method: string, headers: { [string]: string } });
 	}
 
 	request( endpoint: string, body: string ): Promise<User> {
