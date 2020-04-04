@@ -1,16 +1,14 @@
 // @flow
 export default function(
-	body: string,
-	options: URL & { method: string, headers: { [ string ]: string } }
+	apiKey: string,
+	url: string,
+	body: string
 ): Promise<string> {
 	return new Promise( ( resolve, reject ) => {
 		const xhr = new XMLHttpRequest();
 
-		xhr.open( options.method, options.href );
-		xhr.setRequestHeader(
-			'X-Simperium-API-Key',
-			options.headers[ 'X-Simperium-API-Key' ]
-		);
+		xhr.open( 'POST', url );
+		xhr.setRequestHeader( 'X-Simperium-API-Key', apiKey );
 
 		xhr.onload = () => resolve( xhr.responseText );
 		xhr.onerror = () => reject();

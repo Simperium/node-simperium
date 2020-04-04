@@ -1,7 +1,5 @@
 // @flow
 import events from 'events'
-import url from 'url'
-
 import request from './http-request';
 
 // @flow
@@ -74,18 +72,10 @@ export class Auth extends EventEmitter {
 		return this.request( 'create/', body );
 	}
 
-	getUrlOptions( path: string ) {
-		const { port, ...options } = url.parse( `${ baseUrl }/${ this.appId }/${ path }` );
-		return (({
-			... options,
-			port: port ? Number( port ) : undefined,
-			method: 'POST',
-			headers: {'X-Simperium-API-Key': this.appSecret }
-		}: any): URL & { method: string, headers: { [string]: string } });
-	}
-
 	request( endpoint: string, body: string ): Promise<User> {
-		return request( body, this.getUrlOptions( endpoint ) ).then( response => {
+		const authUrl = `${ baseUrl }/${ this.appId }/${ endpoint }`;
+
+		return request( this.appSecret, authUrl, body ).then( response => {
 			try {
 				const user = fromJSON( response );
 				this.emit( 'authorize', user );
@@ -95,7 +85,7 @@ export class Auth extends EventEmitter {
 			}
 		} )
 	}
-};
+}
 
 export default ( appId: string, appSecret: string ) => {
 	return new Auth( appId, appSecret );

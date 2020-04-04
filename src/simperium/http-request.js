@@ -2,11 +2,16 @@
 import https from 'https'
 
 export default function(
+	apiKey: string,
+	url: string,
 	body: string,
-	options: URL & { method: string, headers: { [string]: string } }
 ): Promise<string> {
 	return new Promise( ( resolve, reject ) => {
-		const req = https.request( (options: any), (res: https.IncomingMessage) => {
+		const headers = {
+			'X-Simperium-API-Key': apiKey
+		};
+
+		const req = https.request( url, { headers }, res => {
 			let responseData = '';
 
 			res.on( 'data', data => {

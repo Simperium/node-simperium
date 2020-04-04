@@ -1,11 +1,11 @@
 import buildAuth from '../../src/simperium/auth'
 import https from 'https'
-import { equal, deepEqual } from 'assert'
+import { equal } from 'assert'
 import { EventEmitter } from 'events'
 
 const originalRequest = https.request;
 const stub = ( respond ) => {
-	https.request = ( options, handler ) => {
+	https.request = ( url, options, handler ) => {
 		const req = new EventEmitter()
 		req.end = ( body ) => respond( body, handler )
 		return req
@@ -30,14 +30,6 @@ describe( 'Auth', () => {
 	beforeEach( () => {
 		auth = buildAuth( 'token', 'secret' );
 	} );
-
-	it( 'getUrlOptions', () => {
-		const { hostname, headers, pathname, method } = auth.getUrlOptions( 'path' )
-		equal( method, 'POST' )
-		equal( hostname, 'auth.simperium.com' )
-		equal( pathname, '/1/token/path' )
-		deepEqual( headers, { 'X-Simperium-API-Key': 'secret' } )
-	} )
 
 	it( 'should request auth token', () => {
 		stub( ( data, handler ) => {
