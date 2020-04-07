@@ -11,7 +11,7 @@ export default function(
 			'X-Simperium-API-Key': apiKey
 		};
 
-		const req = https.request( url, { headers }, res => {
+		const req = https.request( url, { method: 'POST', headers }, res => {
 			let responseData = '';
 
 			res.on( 'data', data => {
