@@ -1,5 +1,5 @@
 // @flow
-import https from 'https'
+import { request } from 'https'
 
 export default function(
 	apiKey: string,
@@ -11,7 +11,7 @@ export default function(
 			'X-Simperium-API-Key': apiKey
 		};
 
-		const req = https.request( url, { method: 'POST', headers }, res => {
+		const req = request( url, { method: 'POST', headers }, res => {
 			let responseData = '';
 
 			res.on( 'data', data => {
