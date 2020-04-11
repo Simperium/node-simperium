@@ -1,8 +1,11 @@
 {
   "name": "simperium",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "description": "A simperium client for node.js",
   "main": "./lib/simperium/index.js",
+  "browser": {
+    "./lib/simperium/http-request.js": "./lib/simperium/http-request.browser.js"
+  },
   "repository": {
     "type": "git",
     "url": "git://github.com/Simperium/node-simperium.git"
@@ -22,6 +25,8 @@
   "license": "BSD-2-Clause",
   "dependencies": {
     "@babel/polyfill": "7.7.0",
+    "events": "3.1.0",
+    "inherits": "2.0.4",
     "uuid": "3.3.3",
     "websocket": "1.0.31"
   },

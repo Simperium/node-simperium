@@ -1,5 +1,5 @@
 /*eslint no-shadow: 0*/
-import {format, inherits} from 'util'
+import inherits from 'inherits';
 import {EventEmitter} from 'events'
 import {change as change_util, parseMessage, parseVersionMessage} from './util'
 import {v4 as uuid} from 'uuid'
@@ -585,7 +585,7 @@ Channel.prototype.onConnect = function() {
 		version: '0.0.1'
 	};
 
-	this.send( format( 'init:%s', JSON.stringify( init ) ) );
+	this.send( `init:${ JSON.stringify( init ) }` );
 };
 
 Channel.prototype.onIndex = function( data ) {
@@ -615,11 +615,11 @@ Channel.prototype.onIndex = function( data ) {
 };
 
 Channel.prototype.sendIndexRequest = function( mark ) {
-	this.send( format( 'i:1:%s::10', mark ? mark : '' ) );
+	this.send( `i:1:${ mark ? mark : '' }::10` );
 };
 
 Channel.prototype.sendChangeVersionRequest = function( cv ) {
-	this.send( format( 'cv:%s', cv ) );
+	this.send( `cv:${ cv }` );
 };
 
 Channel.prototype.onChanges = function( changes ) {

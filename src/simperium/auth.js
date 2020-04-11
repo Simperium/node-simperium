@@ -1,7 +1,6 @@
 // @flow
 import events from 'events'
-import { request } from 'https'
-import url from 'url'
+import request from './http-request';
 
 // @flow
 type User = {
@@ -22,7 +21,7 @@ const fromJSON = ( json: string ): User => {
 
 const { EventEmitter } = events;
 
-const URL = 'https://auth.simperium.com/1';
+const baseUrl = 'https://auth.simperium.com/1';
 
 export class AuthError extends Error {
 	underlyingError: Error
@@ -73,44 +72,20 @@ export class Auth extends EventEmitter {
 		return this.request( 'create/', body );
 	}
 
-	getUrlOptions( path: string ) {
-		const { port, ...options } = url.parse( `${URL}/${ this.appId }/${ path}` );
-		return {
-			... options,
-			port: port ? Number( port ) : undefined,
-			method: 'POST',
-			headers: {'X-Simperium-API-Key': this.appSecret }
-		};
-	}
-
 	request( endpoint: string, body: string ): Promise<User> {
-		return new Promise( ( resolve, reject ) => {
-			const req = request( this.getUrlOptions( endpoint ), ( res ) => {
-				let responseData = '';
+		const authUrl = `${ baseUrl }/${ this.appId }/${ endpoint }`;
 
-				res.on( 'data', ( data ) => {
-					responseData += data.toString();
-				} );
-
-				res.on( 'end', () => {
-					try {
-						const user = fromJSON( responseData );
-						resolve( user );
-						this.emit( 'authorize', user );
-					} catch ( error ) {
-						return reject( new AuthError( error ) );
-					}
-				} );
-			} );
-
-			req.on( 'error', ( e ) => {
-				reject( e );
-			} );
-
-			req.end( body );
-		} );
+		return request( this.appSecret, authUrl, body ).then( response => {
+			try {
+				const user = fromJSON( response );
+				this.emit( 'authorize', user );
+				return user;
+			} catch ( error ) {
+				throw new AuthError( error );
+			}
+		} )
 	}
-};
+}
 
 export default ( appId: string, appSecret: string ) => {
 	return new Auth( appId, appSecret );
