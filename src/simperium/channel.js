@@ -133,6 +133,10 @@ internal.updateAcknowledged = function( change ) {
 };
 
 internal.findAcknowledgedChange = function( change ) {
+	if (this.localQueue.seenChanges.has(change.id)) {
+		return this.localQueue.seenChanges.get(change.id);
+	}
+
 	var possibleChange = this.localQueue.sent[change.id];
 	if ( possibleChange ) {
 		if ( ( change.ccids || [] ).indexOf( possibleChange.ccid ) > -1 ) {
@@ -175,6 +179,10 @@ internal.applyChange = function( change, ghost ) {
 	}
 
 	if ( change.o === operation.MODIFY ) {
+		if ( ghost && ghost.version >= change.ev ) {
+			return;
+		}
+
 		if ( ghost && ( ghost.version !== change.sv ) ) {
 			internal.requestObjectVersion.call( this, change.id, change.sv ).then( data => {
 				internal.applyChange.call( this, change, { version: change.sv, data } )
@@ -714,6 +722,7 @@ Queue.prototype.run = function() {
 function LocalQueue( store ) {
 	this.store = store;
 	this.sent = {};
+	this.seenChanges = new Map();
 	this.queues = {};
 	this.ready = false;
 }
@@ -734,6 +743,7 @@ LocalQueue.prototype.pause = function() {
 
 LocalQueue.prototype.acknowledge = function( change ) {
 	if ( this.sent[change.id] === change ) {
+		this.seenChanges.set( change.id, change );
 		delete this.sent[change.id];
 	}
 
