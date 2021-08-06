@@ -9,8 +9,9 @@ type User = {
 };
 
 const fromJSON = (json: string): User => {
+  let data;
   try {
-    const data = JSON.parse(json);
+    data = JSON.parse(json);
   } catch (error) {
     throw new Error(json);
   }
