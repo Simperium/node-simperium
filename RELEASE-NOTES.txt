@@ -2,7 +2,7 @@
 
 ## 1.1.2
 
-- Updates the error messaging to include the server reponse during failed authentication [#111](https://github.com/simperium/node-simperium/pull/111)
+- Updates the error messaging to include the server response during failed authentication [#111](https://github.com/simperium/node-simperium/pull/111)
 
 ## 1.1.0 - 1.1.1
 
