@@ -8,11 +8,16 @@ type User = {
 	access_token: string,
 };
 
-const fromJSON = ( json: string ): User => {
-	const data = JSON.parse( json );
-	if ( ! data.access_token && typeof data.access_token !== 'string' ) {
-		throw new Error( 'access_token not present' );
-	}
+const fromJSON = (json: string): User => {
+  let data;
+  try {
+    data = JSON.parse(json);
+  } catch (error) {
+    throw new Error(json);
+  }
+  if (!data.access_token && typeof data.access_token !== 'string') {
+    throw new Error('access_token not present');
+  }
 	return {
 		options: data,
 		access_token: new String( data.access_token ).toString()
