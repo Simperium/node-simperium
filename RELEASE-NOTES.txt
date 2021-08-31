@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.3
+
+- Fixes a sync issue by reverting the changes from PR #101 [#114](https://github.com/simperium/node-simperium/pull/114)
+
 ## 1.1.2
 
 - Updates the error messaging to include the server response during failed authentication [#111](https://github.com/simperium/node-simperium/pull/111)
