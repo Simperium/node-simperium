@@ -1,9 +1,8 @@
 # Changelog
 
-## 1.1.0 - 1.1.1
+## 1.1.0
 
  - Increase usability in other projects by separating `node` and browser modules [#100](https://github.com/Simperium/node-simperium/pull/100)
- - Stop applying changes that have already been applied to an entity [#101](https://github.com/Simperium/node-simperium/pull/101)
 
 ## 1.0.4
 
