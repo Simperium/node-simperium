@@ -12,7 +12,7 @@ export default function(
 
 		xhr.onload = () => {
 			const message = xhr.status === 429 && xhr.responseText === ''
-				? 'too many retries'
+				? 'too many requests'
 				: xhr.responseText;
 			resolve(message);
 		};
