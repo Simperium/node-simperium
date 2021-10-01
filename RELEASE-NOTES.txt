@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.4
+
+- Adds a message response when receiving a 429 HTTP error [#115](https://github.com/simperium/node-simperium/pull/115)
+
 ## 1.1.3
 
 - Fixes a sync issue by reverting the changes from PR #101 [#114](https://github.com/simperium/node-simperium/pull/114)
